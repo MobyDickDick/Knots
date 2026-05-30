@@ -173,3 +173,35 @@ from knots_grid import trace_turtle, render_svg
 
 trace = trace_turtle("0111")
 render_svg(trace.points, "square.svg")
+```
+
+## Kompakte Turtle-Bitcodierung
+
+Zusätzlich zur lesbaren Turtle-Zeichenkette gibt es einen bitweisen Codec in
+`knots_grid.compact`.  Jeder Eintrag besteht aus zwei Befehlsbits und danach
+einer selbstbegrenzenden Zahl.  Die Zahl wird als Binärziffern geschrieben;
+nach jeder Ziffer folgt ein Fortsetzungsbit (`1` = weitere Ziffer, `0` = Ende).
+So wird `4` zu `110100` und `7` zu `111110`.
+
+| Bits | Bedeutung |
+|---|---|
+| `00 n` | `n` Schritte vorwärts |
+| `01 n` | links drehen, dann `n` Schritte vorwärts |
+| `10 n` | rechts drehen, dann `n` Schritte vorwärts |
+| `11 n` | Ebene wechseln, dann `n` Schritte vorwärts (`n = 0` nur Ebenenwechsel) |
+
+Beispiel am klassischen Unknoten `0_1` als Rechteckdiagramm:
+
+```bash
+python -m knots_grid.compact encode 0000010010000100
+# 0011011001111001110110011110
+
+python -m knots_grid.compact decode 0011011001111001110110011110
+# 0000010010000100
+```
+
+Die alte Darstellung benötigt hier 16 Turtle-Befehle, also 32 Bits bei der
+naiven 2-Bit-Codierung.  Die kompakte Darstellung benötigt 28 Bits und dekodiert
+wieder exakt zur ursprünglichen Beschreibung.  Wichtig: Diese variable
+Längencodierung ist nicht für jede kurze Eingabe kleiner, spart aber bei längeren
+geraden Laufstücken Bits.
