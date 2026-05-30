@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "knots-grid"
+version = "0.1.0"
+description = "Two-layer grid and turtle-code experiments for knot diagrams"
+requires-python = ">=3.10"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+  { name = "Markus Demarmels" }
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
