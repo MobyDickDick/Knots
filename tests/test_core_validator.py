@@ -42,5 +42,37 @@ class ValidatorTests(unittest.TestCase):
         self.assertFalse(is_valid_edge(Point(0, 0, 0), Point(1, 0, 1)))
 
 
+class CompactCodecTests(unittest.TestCase):
+    def test_number_examples_match_digit_continuation_scheme(self):
+        from knots_grid.compact import decode_number, encode_number
+
+        self.assertEqual(encode_number(4), "110100")
+        self.assertEqual(encode_number(7), "111110")
+        self.assertEqual(decode_number("110100"), (4, 6))
+        self.assertEqual(decode_number("111110"), (7, 6))
+
+    def test_known_unknot_round_trip_and_compression(self):
+        from knots_grid.compact import decode_turtle, encode_turtle, trace_compact
+
+        # Rectangular diagram of the classical unknot 0_1: east 5, north 3,
+        # west 5, south 3, returning to the start.
+        code = "00000" + "1" + "00" + "1" + "0000" + "1" + "00"
+        packed = encode_turtle(code)
+        unpacked = decode_turtle(packed)
+
+        self.assertEqual(unpacked, code)
+        self.assertEqual(trace_compact(packed).points, trace_turtle(code).points)
+        self.assertEqual(trace_turtle(unpacked).points[0], trace_turtle(unpacked).points[-1])
+        self.assertLess(len(packed), len(code) * 2)
+
+    def test_layer_switch_with_zero_steps_round_trips(self):
+        from knots_grid.compact import decode_turtle, encode_turtle, trace_compact
+
+        packed = encode_turtle("3")
+        self.assertEqual(packed, "11" + "00")
+        self.assertEqual(decode_turtle(packed), "3")
+        self.assertEqual(trace_compact(packed).points, trace_turtle("3").points)
+
+
 if __name__ == "__main__":
     unittest.main()
