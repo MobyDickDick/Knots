@@ -100,11 +100,16 @@ Dateien:
 src/knots_grid/generator.py
 ```
 
-Erste Stufe:
+Erste Stufe (umgesetzt):
 
-- einfache Kandidaten erzeugen,
-- Validierung erzwingen,
-- später Bewertungsfunktion für schöne Projektionen.
+- [x] einfache, reproduzierbare Rechteckkandidaten erzeugen,
+- [x] optional eine Seite in die zweite Ebene anheben,
+- [x] Validierung für jeden erzeugten Kandidaten erzwingen.
+
+Nächste Stufe:
+
+- [ ] Suchverfahren für vielfältigere Kandidaten ergänzen,
+- [ ] Bewertungsfunktion für schöne Projektionen einführen.
 
 Mögliche Kriterien:
 
