@@ -108,7 +108,7 @@ Erste Stufe (umgesetzt):
 
 Nächste Stufe:
 
-- [ ] Suchverfahren für vielfältigere Kandidaten ergänzen,
+- [x] reproduzierbare lokale Suche mit rechteckigen Umwegen und Kanten-Lifts ergänzen,
 - [ ] Bewertungsfunktion für schöne Projektionen einführen.
 
 Mögliche Kriterien:
