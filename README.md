@@ -225,3 +225,25 @@ config = GeneratorConfig(
 candidate = generate_candidate(seed=2026, config=config)
 batch = generate_candidates(10, seed=2026, config=config)
 ```
+
+## Vielfältigere Kandidaten suchen
+
+Die lokale Suche startet mit einem validierten Rechteck und verändert zufällig
+gewählte Kanten schrittweise. Eine Kante wird entweder durch einen rechteckigen
+Umweg aus drei Kanten ersetzt oder vorübergehend in die andere Ebene gehoben.
+Belegte Punkte werden dabei übersprungen, und das Endergebnis wird erneut durch
+den Validator geprüft. Seed und Konfiguration machen einzelne Kandidaten sowie
+ganze Batches reproduzierbar.
+
+```python
+from knots_grid import SearchConfig, search_candidate, search_candidates
+
+config = SearchConfig(
+    min_search_steps=6,
+    max_search_steps=18,
+    layer_probability=0.3,
+)
+
+candidate = search_candidate(seed=2026, config=config)
+batch = search_candidates(10, seed=2026, config=config)
+```

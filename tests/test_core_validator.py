@@ -132,6 +132,62 @@ class GeneratorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             generate_candidates(-1)
 
+    def test_search_is_reproducible_varied_and_valid(self):
+        from knots_grid import SearchConfig, search_candidate
+
+        config = SearchConfig(
+            min_side_length=3,
+            max_side_length=3,
+            min_search_steps=5,
+            max_search_steps=5,
+            layer_probability=0.0,
+        )
+        first = search_candidate(seed=2026, config=config)
+        second = search_candidate(seed=2026, config=config)
+
+        self.assertEqual(first, second)
+        self.assertEqual(len(first.points), 4 * 3 + 1 + 2 * 5)
+        self.assertTrue(validate_cycle(first.points).is_valid)
+
+    def test_search_can_lift_local_edges(self):
+        from knots_grid import SearchConfig, search_candidate
+
+        candidate = search_candidate(
+            seed=7,
+            config=SearchConfig(
+                min_side_length=3,
+                max_side_length=3,
+                min_search_steps=3,
+                max_search_steps=3,
+                layer_probability=1.0,
+            ),
+        )
+
+        self.assertEqual(candidate.code.count("3"), 6)
+        self.assertEqual({point.z for point in candidate.points}, {0, 1})
+        self.assertTrue(validate_cycle(candidate.points).is_valid)
+
+    def test_search_batch_uses_one_reproducible_stream(self):
+        from knots_grid import search_candidates
+
+        batch = search_candidates(4, seed=99)
+
+        self.assertEqual(batch, search_candidates(4, seed=99))
+        self.assertEqual(len(batch), 4)
+        self.assertTrue(all(validate_cycle(candidate.points).is_valid for candidate in batch))
+
+    def test_search_rejects_invalid_configuration(self):
+        from knots_grid import SearchConfig, search_candidates
+
+        with self.assertRaises(ValueError):
+            SearchConfig(min_search_steps=-1)
+        with self.assertRaises(ValueError):
+            SearchConfig(min_search_steps=5, max_search_steps=4)
+        with self.assertRaises(ValueError):
+            SearchConfig(layer_probability=-0.1)
+        with self.assertRaises(ValueError):
+            search_candidates(-1)
+
 
 if __name__ == "__main__":
     unittest.main()
