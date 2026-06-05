@@ -74,5 +74,64 @@ class CompactCodecTests(unittest.TestCase):
         self.assertEqual(trace_compact(packed).points, trace_turtle("3").points)
 
 
+class GeneratorTests(unittest.TestCase):
+    def test_seeded_generation_is_reproducible_and_valid(self):
+        from knots_grid import generate_candidate
+
+        first = generate_candidate(seed=2026)
+        second = generate_candidate(seed=2026)
+
+        self.assertEqual(first, second)
+        self.assertTrue(validate_cycle(first.points).is_valid)
+
+    def test_layered_generation_adds_two_layer_switches(self):
+        from knots_grid import GeneratorConfig, generate_candidate
+
+        candidate = generate_candidate(
+            seed=7,
+            config=GeneratorConfig(
+                min_side_length=2,
+                max_side_length=2,
+                layer_probability=1.0,
+            ),
+        )
+
+        self.assertEqual(candidate.code.count("3"), 2)
+        self.assertEqual({point.z for point in candidate.points}, {0, 1})
+        self.assertTrue(validate_cycle(candidate.points).is_valid)
+
+    def test_planar_generation_stays_on_lower_layer(self):
+        from knots_grid import GeneratorConfig, generate_candidate
+
+        candidate = generate_candidate(
+            seed=7,
+            config=GeneratorConfig(layer_probability=0.0),
+        )
+
+        self.assertNotIn("3", candidate.code)
+        self.assertEqual({point.z for point in candidate.points}, {0})
+
+    def test_candidate_batch_uses_one_reproducible_stream(self):
+        from knots_grid import generate_candidates
+
+        batch = generate_candidates(4, seed=99)
+
+        self.assertEqual(batch, generate_candidates(4, seed=99))
+        self.assertEqual(len(batch), 4)
+        self.assertTrue(all(validate_cycle(candidate.points).is_valid for candidate in batch))
+
+    def test_generator_rejects_invalid_configuration(self):
+        from knots_grid import GeneratorConfig, generate_candidates
+
+        with self.assertRaises(ValueError):
+            GeneratorConfig(min_side_length=0)
+        with self.assertRaises(ValueError):
+            GeneratorConfig(min_side_length=5, max_side_length=4)
+        with self.assertRaises(ValueError):
+            GeneratorConfig(layer_probability=1.1)
+        with self.assertRaises(ValueError):
+            generate_candidates(-1)
+
+
 if __name__ == "__main__":
     unittest.main()

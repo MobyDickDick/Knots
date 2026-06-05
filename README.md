@@ -205,3 +205,23 @@ naiven 2-Bit-Codierung.  Die kompakte Darstellung benötigt 28 Bits und dekodier
 wieder exakt zur ursprünglichen Beschreibung.  Wichtig: Diese variable
 Längencodierung ist nicht für jede kurze Eingabe kleiner, spart aber bei längeren
 geraden Laufstücken Bits.
+
+## Validierte Kandidaten erzeugen
+
+Die erste Generatorstufe erzeugt mit einem lokalen Zufallszahlengenerator
+reproduzierbare Rechteckzyklen. Abhängig von der Konfiguration wird eine Seite
+vollständig in die obere Ebene angehoben; jeder Kandidat wird vor der Rückgabe
+mit dem Validator geprüft.
+
+```python
+from knots_grid import GeneratorConfig, generate_candidate, generate_candidates
+
+config = GeneratorConfig(
+    min_side_length=2,
+    max_side_length=8,
+    layer_probability=0.75,
+)
+
+candidate = generate_candidate(seed=2026, config=config)
+batch = generate_candidates(10, seed=2026, config=config)
+```
