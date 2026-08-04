@@ -281,6 +281,36 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(len({canonical_key(entry.points) for entry in first}), 8)
         self.assertTrue(all(validate_cycle(entry.points).is_valid for entry in first))
 
+    def test_catalog_has_one_unknot_then_distinct_reduced_knots(self):
+        from knots_grid import reidemeister_conditions
+        from knots_grid.catalog import generate_catalog
+
+        entries = generate_catalog(5, mode="systematic")
+
+        self.assertEqual([entry.knot_name for entry in entries],
+                         ["0_1", "T(2,3)", "T(2,5)", "T(2,7)", "T(2,9)"])
+        self.assertEqual(len({entry.determinant for entry in entries}), len(entries))
+        for entry in entries[1:]:
+            report = reidemeister_conditions(entry.points)
+            self.assertFalse(report.type_i)
+            self.assertFalse(report.type_ii)
+
+    def test_catalog_writes_svg_and_png_for_every_entry(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from knots_grid.catalog import generate_catalog, write_catalog
+
+        with TemporaryDirectory() as directory:
+            entries = generate_catalog(3, mode="systematic")
+            manifest = write_catalog(entries, directory)
+
+            self.assertTrue(manifest.is_file())
+            for entry in entries:
+                stem = Path(directory) / f"knot_{entry.index:03d}"
+                self.assertTrue(stem.with_suffix(".svg").is_file())
+                self.assertEqual(stem.with_suffix(".png").read_bytes()[:8],
+                                 b"\x89PNG\r\n\x1a\n")
+
 
 if __name__ == "__main__":
     unittest.main()

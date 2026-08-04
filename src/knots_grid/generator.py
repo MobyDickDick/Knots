@@ -74,6 +74,34 @@ def trefoil_candidate() -> TraceResult:
     return _grid_diagram_candidate((0, 1, 2, 3, 4), (2, 3, 4, 0, 1))
 
 
+def torus_knot_candidate(crossings: int) -> TraceResult:
+    """Return the reduced grid diagram of the torus knot ``T(2, crossings)``.
+
+    ``crossings`` must be odd and at least three.  These knots are prime and
+    pairwise distinct: their determinants equal ``crossings``.  The grid size
+    ``crossings + 2`` is the arc index of ``T(2, crossings)``, so this standard
+    diagram cannot be destabilized further; it also contains no reducing
+    Reidemeister-I or -II configuration.
+    """
+
+    if crossings < 3 or crossings % 2 == 0:
+        raise ValueError("crossings must be an odd integer of at least 3")
+    size = crossings + 2
+    candidate = _grid_diagram_candidate(
+        tuple(range(size)), tuple((column + 2) % size for column in range(size))
+    )
+
+    # Keep the mathematical construction and our combinatorial reducer in
+    # lockstep.  A future change to either must not silently emit a reducible
+    # catalog entry.
+    from .reidemeister import reidemeister_conditions
+
+    report = reidemeister_conditions(candidate.points)
+    if report.type_i or report.type_ii:
+        raise RuntimeError("standard torus-knot diagram unexpectedly became reducible")
+    return candidate
+
+
 def _grid_diagram_candidate(
     x_columns: tuple[int, ...], o_columns: tuple[int, ...]
 ) -> TraceResult:

@@ -10,7 +10,9 @@ from .generator import (
     search_candidate,
     search_candidates,
     trefoil_candidate,
+    torus_knot_candidate,
 )
+from .png import render_png
 from .reidemeister import Crossing, ReidemeisterReport, find_crossings, reidemeister_conditions
 from .svg import render_svg
 from .validator import ValidationResult, validate_cycle
@@ -31,8 +33,10 @@ __all__ = [
     "search_candidate",
     "search_candidates",
     "trefoil_candidate",
+    "torus_knot_candidate",
     "reidemeister_conditions",
     "render_svg",
+    "render_png",
     "trace_turtle",
     "validate_cycle",
 ]
