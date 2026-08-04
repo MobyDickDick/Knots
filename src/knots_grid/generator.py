@@ -61,6 +61,63 @@ class SearchConfig:
             raise ValueError("layer_probability must be between 0 and 1")
 
 
+def trefoil_candidate() -> TraceResult:
+    """Construct a genuine trefoil from its minimal 5x5 grid diagram.
+
+    Horizontal grid segments use layer zero and vertical segments layer one,
+    so every interior intersection has unambiguous under/over information.
+    Unlike the local detours used by :func:`search_candidate`, this diagram is
+    not obtained from an unknot by isotopy-preserving expansions.
+    """
+
+    # X and O columns by row for a standard grid-number-five trefoil.
+    return _grid_diagram_candidate((0, 1, 2, 3, 4), (2, 3, 4, 0, 1))
+
+
+def _grid_diagram_candidate(
+    x_columns: tuple[int, ...], o_columns: tuple[int, ...]
+) -> TraceResult:
+    size = len(x_columns)
+    if size < 2 or len(o_columns) != size:
+        raise ValueError("a grid diagram needs equally many X and O markers")
+    expected = set(range(size))
+    if set(x_columns) != expected or set(o_columns) != expected:
+        raise ValueError("X and O columns must each be a permutation of the grid columns")
+
+    o_row_by_column = {column: row for row, column in enumerate(o_columns)}
+    # Turtle traces start facing east, so choose an east-going horizontal arc
+    # as the cyclic start. Every non-degenerate grid diagram has either such
+    # an arc or can be reflected; requiring it here keeps encoding explicit.
+    try:
+        row = next(row for row in range(size) if o_columns[row] < x_columns[row])
+    except StopIteration as error:
+        raise ValueError("grid diagram has no east-going horizontal arc") from error
+    points = [Point(o_columns[row], row, 0)]
+    visited_rows: set[int] = set()
+    while row not in visited_rows:
+        visited_rows.add(row)
+        x_column = x_columns[row]
+        _append_axis_steps(points, x_column, row, 0)
+        points.append(points[-1].switched_layer())
+        row = o_row_by_column[x_column]
+        _append_axis_steps(points, x_column, row, 1)
+        points.append(points[-1].switched_layer())
+    if len(visited_rows) != size or points[-1] != points[0]:
+        raise ValueError("grid markers do not describe one closed knot component")
+
+    code = _points_to_code(points)
+    return make_candidate(code)
+
+
+def _append_axis_steps(points: list[Point], x: int, y: int, z: int) -> None:
+    target = Point(x, y, z)
+    while points[-1] != target:
+        current = points[-1]
+        dx = 0 if current.x == x else (1 if x > current.x else -1)
+        dy = 0 if current.y == y else (1 if y > current.y else -1)
+        points.append(Point(current.x + dx, current.y + dy, z))
+
+
 def make_candidate(code: str) -> TraceResult:
     """Trace a hand-written turtle code and require a valid cycle."""
 

@@ -248,6 +248,28 @@ candidate = search_candidate(seed=2026, config=config)
 batch = search_candidates(10, seed=2026, config=config)
 ```
 
+## Einen wirklichen Knoten erzeugen
+
+Lokale rechteckige Umwege und Kanten-Lifts ändern den Knotentyp nicht; aus
+einem Rechteck entsteht damit weiterhin nur ein Unknoten. Für einen echten
+Knoten wird deshalb ein **Grid-Diagramm** verwendet. `trefoil_candidate()`
+verbindet die X-/O-Marker eines minimalen 5x5-Trefoil-Diagramms, legt alle
+horizontalen Segmente nach `z=0` und alle vertikalen nach `z=1` und erzeugt so
+drei eindeutige Über-/Unterkreuzungen.
+
+```python
+from knots_grid import find_crossings, trefoil_candidate
+
+trefoil = trefoil_candidate()
+assert len(find_crossings(trefoil.points)) == 3
+```
+
+`reidemeister_conditions(points)` wertet außerdem die notwendigen lokalen
+Gauss-Wort-Bedingungen aus: benachbarte Doppelbesuche für Typ I, zwei gemeinsam
+begrenzte Bögen mit konsistenter Überführung für Typ II und das Dreiecksmuster
+für Typ III. Die Treffer sind bewusst Kandidaten; vor einer automatischen
+Umformung muss zusätzlich geprüft werden, dass die betroffene Fläche leer ist.
+
 ## Kanonischen Katalog mit 100 Kandidaten erzeugen
 
 Der Kataloggenerator normalisiert Translationen auf `x >= 0, y >= 0` und

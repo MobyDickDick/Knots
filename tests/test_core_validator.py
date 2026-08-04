@@ -75,6 +75,15 @@ class CompactCodecTests(unittest.TestCase):
 
 
 class GeneratorTests(unittest.TestCase):
+    def test_trefoil_is_valid_and_has_real_crossings(self):
+        from knots_grid import find_crossings, trefoil_candidate
+
+        candidate = trefoil_candidate()
+
+        self.assertTrue(validate_cycle(candidate.points).is_valid)
+        self.assertEqual(len(find_crossings(candidate.points)), 3)
+        self.assertEqual({point.z for point in candidate.points}, {0, 1})
+
     def test_seeded_generation_is_reproducible_and_valid(self):
         from knots_grid import generate_candidate
 
@@ -187,6 +196,29 @@ class GeneratorTests(unittest.TestCase):
             SearchConfig(layer_probability=-0.1)
         with self.assertRaises(ValueError):
             search_candidates(-1)
+
+
+class ReidemeisterTests(unittest.TestCase):
+    def test_trefoil_has_no_reidemeister_one_or_two_candidate(self):
+        from knots_grid import reidemeister_conditions, trefoil_candidate
+
+        report = reidemeister_conditions(trefoil_candidate().points)
+
+        self.assertEqual(len(report.crossings), 3)
+        self.assertEqual(report.type_i, ())
+        self.assertEqual(report.type_ii, ())
+        self.assertEqual(report.type_iii, ((0, 1, 2),))
+
+    def test_layer_switch_is_not_misclassified_as_crossing(self):
+        from knots_grid import GeneratorConfig, find_crossings, generate_candidate
+
+        candidate = generate_candidate(
+            seed=7,
+            config=GeneratorConfig(
+                min_side_length=2, max_side_length=2, layer_probability=1.0
+            ),
+        )
+        self.assertEqual(find_crossings(candidate.points), ())
 
 
 class CatalogTests(unittest.TestCase):

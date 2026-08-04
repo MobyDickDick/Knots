@@ -110,6 +110,7 @@ Nächste Stufe:
 
 - [x] reproduzierbare lokale Suche mit rechteckigen Umwegen und Kanten-Lifts ergänzen,
 - [ ] Bewertungsfunktion für schöne Projektionen einführen.
+- [x] echten Trefoil über ein 5x5-Grid-Diagramm konstruieren.
 
 Mögliche Kriterien:
 
@@ -122,19 +123,18 @@ Mögliche Kriterien:
 
 ## Modul 5: Knotenprüfer
 
-Dateien später:
+Dateien:
 
 ```text
-src/knots_grid/crossings.py
 src/knots_grid/reidemeister.py
 ```
 
 Ziel:
 
-- flache Projektion erzeugen,
-- Schnittpunkte von Kanten finden,
-- Über-/Unterinformation aus $z$ bestimmen,
-- später Reidemeister-Züge oder einfache Knoteninvarianten.
+- [x] flache Kreuzungen samt Über-/Unterinformation aus $z$ bestimmen,
+- [x] notwendige Gauss-Wort-Bedingungen für Reidemeister I--III erkennen,
+- [ ] geometrisch leere Zugregionen prüfen und Züge tatsächlich ausführen,
+- [ ] einfache Knoteninvarianten ergänzen.
 
 ## Modul 6: Bild-Abzeichner
 
