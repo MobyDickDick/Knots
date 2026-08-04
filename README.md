@@ -270,11 +270,17 @@ begrenzte Bögen mit konsistenter Überführung für Typ II und das Dreiecksmust
 für Typ III. Die Treffer sind bewusst Kandidaten; vor einer automatischen
 Umformung muss zusätzlich geprüft werden, dass die betroffene Fläche leer ist.
 
-## Kanonischen Katalog mit 100 Kandidaten erzeugen
+## Katalog mit paarweise verschiedenen Knoten erzeugen
 
-Der Kataloggenerator normalisiert Translationen auf `x >= 0, y >= 0` und
-entfernt Dubletten, die sich nur durch Startpunkt, Laufrichtung oder eine der
-acht Symmetrien des quadratischen Gitters unterscheiden. Die kanonische Form
+Der Katalog beginnt mit **höchstens einem Unknoten**. Danach werden reduzierte
+Grid-Diagramme der Torusknoten `T(2,3)`, `T(2,5)`, `T(2,7)`, … erzeugt. Das
+sind echte, paarweise verschiedene Knoten: Ihre Determinanten sind
+3, 5, 7, … und unterscheiden daher bereits die Knotentypen. Die verwendeten
+Diagramme haben weder einen reduzierenden Reidemeister-I- noch einen
+Reidemeister-II-Kandidaten; ihre Grid-Größe ist zugleich die minimale
+Bogenzahl dieser Knotenfamilie.
+
+Der Kataloggenerator normalisiert Translationen auf `x >= 0, y >= 0`. Die kanonische Form
 minimiert **zuerst ausschließlich die Punktzahl**. Nur wenn zwei als äquivalent
 bekannte Darstellungen gleich viele Punkte besitzen, werden lexikographisch die
 Cantor-Indizes der geordneten Punkte verglichen. Anders als bloße
@@ -292,8 +298,9 @@ Für einen reproduzierbaren Durchlauf über aufsteigende Generator-Seeds:
 python -m knots_grid.catalog --count 100 --mode systematic --output knot_catalog
 ```
 
-Das Zielverzeichnis enthält `knot_000.svg` bis `knot_099.svg` und eine
-`catalog.json` mit Punkten, Maßen und Seeds. „Kanonisch“ bezieht sich hier auf
+Das Zielverzeichnis enthält für jeden Eintrag **ein SVG und ein PNG** sowie eine
+`catalog.json` mit Knotennamen, Determinante, Punkten, Maßen und Seeds.
+„Kanonisch“ bezieht sich hier auf
 die genannten exakten Gittersymmetrien. Eine vollständige Entscheidung der
 Reidemeister- beziehungsweise Knotenäquivalenz ist damit ausdrücklich noch
 nicht geleistet. Die Funktion zur Repräsentantenwahl setzt deshalb voraus,

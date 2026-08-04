@@ -15,8 +15,10 @@ from pathlib import Path
 from random import Random
 from typing import Iterable, Iterator
 
-from .core import Point
-from .generator import SearchConfig, search_candidate
+from .core import Point, trace_turtle
+from .generator import SearchConfig, torus_knot_candidate
+from .png import render_png
+from .reidemeister import reidemeister_conditions
 from .svg import render_svg
 from .validator import validate_cycle
 
@@ -99,6 +101,8 @@ class CatalogEntry:
     index: int
     seed: int
     points: tuple[Point, ...]
+    knot_name: str = "unknown"
+    determinant: int = 0
 
     @property
     def measure(self) -> tuple[int, tuple[int, ...]]:
@@ -113,10 +117,11 @@ def generate_catalog(
     config: SearchConfig = SearchConfig(),
     max_attempts: int | None = None,
 ) -> tuple[CatalogEntry, ...]:
-    """Generate distinct canonical candidates randomly or by ascending seeds.
+    """Generate at most one unknot followed by pairwise distinct real knots.
 
-    ``systematic`` means deterministic exploration of generator seeds 0, 1,
-    2, ...; it is not an exhaustive enumeration of all mathematical knots.
+    Real entries are reduced ``T(2, q)`` diagrams for distinct odd ``q``.
+    Their different determinants prove that they are different knot types,
+    rather than merely different drawings of the same knot.
     """
 
     if count < 0:
@@ -127,18 +132,36 @@ def generate_catalog(
     if limit < 0:
         raise ValueError("max_attempts must be non-negative")
 
-    seeds = _candidate_seeds(mode, seed)
-    seen: set[CanonicalKey] = set()
+    if count == 0:
+        return ()
+
     entries: list[CatalogEntry] = []
+    unknot = canonicalize_cycle(trace_turtle("1111").points)
+    entries.append(CatalogEntry(0, -1, unknot, "0_1", 1))
+    if count == 1:
+        return tuple(entries)
+
+    seeds = _candidate_seeds(mode, seed)
+    seen_crossings: set[int] = set()
     for _ in range(limit):
         candidate_seed = next(seeds)
-        candidate = search_candidate(seed=candidate_seed, config=config)
-        canonical = canonicalize_cycle(candidate.points)
-        key = tuple((point.x, point.y, point.z) for point in canonical[:-1])
-        if key in seen:
+        if mode == "systematic":
+            crossings = 3 + 2 * len(seen_crossings)
+        else:
+            crossings = 3 + 2 * (candidate_seed % max(32, count * 4))
+        if crossings in seen_crossings:
             continue
-        seen.add(key)
-        entries.append(CatalogEntry(len(entries), candidate_seed, canonical))
+        candidate = torus_knot_candidate(crossings)
+        report = reidemeister_conditions(candidate.points)
+        if report.type_i or report.type_ii:
+            continue
+        canonical = canonicalize_cycle(candidate.points)
+        seen_crossings.add(crossings)
+        entries.append(
+            CatalogEntry(
+                len(entries), candidate_seed, canonical, f"T(2,{crossings})", crossings
+            )
+        )
         if len(entries) == count:
             return tuple(entries)
 
@@ -152,13 +175,25 @@ def write_catalog(entries: Iterable[CatalogEntry], directory: str | Path) -> Pat
     target.mkdir(parents=True, exist_ok=True)
     records: list[dict[str, object]] = []
     for entry in entries:
-        filename = f"knot_{entry.index:03d}.svg"
-        render_svg(entry.points, target / filename)
+        svg_filename = f"knot_{entry.index:03d}.svg"
+        png_filename = f"knot_{entry.index:03d}.png"
+        render_svg(entry.points, target / svg_filename)
+        span = max(
+            max(point.x for point in entry.points) - min(point.x for point in entry.points),
+            max(point.y for point in entry.points) - min(point.y for point in entry.points),
+        )
+        # Keep large catalogs practical: high-crossing torus knots still get a
+        # useful raster preview without creating quadratic multi-gigabyte PNGs.
+        png_scale = max(4.0, min(32.0, 1024.0 / (span + 2)))
+        render_png(entry.points, target / png_filename, scale=png_scale)
         records.append(
             {
                 "index": entry.index,
                 "seed": entry.seed,
-                "svg": filename,
+                "name": entry.knot_name,
+                "determinant": entry.determinant,
+                "svg": svg_filename,
+                "png": png_filename,
                 "point_count": len(entry.points) - 1,
                 "measure": [entry.measure[0], list(entry.measure[1])],
                 "points": [[p.x, p.y, p.z] for p in entry.points[:-1]],
