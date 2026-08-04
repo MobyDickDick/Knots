@@ -247,3 +247,32 @@ config = SearchConfig(
 candidate = search_candidate(seed=2026, config=config)
 batch = search_candidates(10, seed=2026, config=config)
 ```
+
+## Kanonischen Katalog mit 100 Kandidaten erzeugen
+
+Der Kataloggenerator normalisiert Translationen auf `x >= 0, y >= 0` und
+entfernt Dubletten, die sich nur durch Startpunkt, Laufrichtung oder eine der
+acht Symmetrien des quadratischen Gitters unterscheiden. Die kanonische Form
+minimiert **zuerst ausschließlich die Punktzahl**. Nur wenn zwei als äquivalent
+bekannte Darstellungen gleich viele Punkte besitzen, werden lexikographisch die
+Cantor-Indizes der geordneten Punkte verglichen. Anders als bloße
+Koordinatensummen ist dieses sekundäre Maß kollisionsfrei und erhält die
+Reihenfolge des Pfades. `choose_shortest_equivalent(...)` wendet genau diese
+Priorität auf eine bereits festgestellte Äquivalenzklasse an.
+
+```bash
+python -m knots_grid.catalog --count 100 --mode random --seed 2026 --output knot_catalog
+```
+
+Für einen reproduzierbaren Durchlauf über aufsteigende Generator-Seeds:
+
+```bash
+python -m knots_grid.catalog --count 100 --mode systematic --output knot_catalog
+```
+
+Das Zielverzeichnis enthält `knot_000.svg` bis `knot_099.svg` und eine
+`catalog.json` mit Punkten, Maßen und Seeds. „Kanonisch“ bezieht sich hier auf
+die genannten exakten Gittersymmetrien. Eine vollständige Entscheidung der
+Reidemeister- beziehungsweise Knotenäquivalenz ist damit ausdrücklich noch
+nicht geleistet. Die Funktion zur Repräsentantenwahl setzt deshalb voraus,
+dass die Äquivalenz der übergebenen Knoten zuvor bewiesen wurde.

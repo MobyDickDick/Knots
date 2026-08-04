@@ -189,5 +189,66 @@ class GeneratorTests(unittest.TestCase):
             search_candidates(-1)
 
 
+class CatalogTests(unittest.TestCase):
+    def test_canonicalization_removes_translation_start_and_reversal(self):
+        from knots_grid import Point
+        from knots_grid.catalog import canonicalize_cycle
+
+        square = (
+            Point(3, 4, 0), Point(4, 4, 0), Point(4, 5, 0),
+            Point(3, 5, 0), Point(3, 4, 0),
+        )
+        shifted_reversed = tuple(reversed(square))
+        first = canonicalize_cycle(square)
+        second = canonicalize_cycle(shifted_reversed)
+
+        self.assertEqual(first, second)
+        self.assertEqual(min(point.x for point in first), 0)
+        self.assertEqual(min(point.y for point in first), 0)
+
+    def test_sequence_measure_does_not_collapse_equal_coordinate_sums(self):
+        from knots_grid import Point
+        from knots_grid.catalog import sequence_measure
+
+        first = (Point(0, 0, 0), Point(1, 1, 0))
+        second = (Point(1, 0, 0), Point(0, 1, 0))
+        self.assertNotEqual(sequence_measure(first), sequence_measure(second))
+
+    def test_shorter_equivalent_wins_before_cantor_measure(self):
+        from knots_grid import Point
+        from knots_grid.catalog import choose_shortest_equivalent
+
+        square = (
+            Point(0, 0, 0), Point(1, 0, 0), Point(1, 1, 0),
+            Point(0, 1, 0), Point(0, 0, 0),
+        )
+        square_with_detour = (
+            Point(0, 0, 0), Point(1, 0, 0), Point(1, -1, 0),
+            Point(2, -1, 0), Point(2, 0, 0), Point(2, 1, 0),
+            Point(1, 1, 0), Point(0, 1, 0), Point(0, 0, 0),
+        )
+
+        chosen = choose_shortest_equivalent((square_with_detour, square))
+        self.assertEqual(len(chosen) - 1, 4)
+
+    def test_shortest_equivalent_requires_a_candidate(self):
+        from knots_grid.catalog import choose_shortest_equivalent
+
+        with self.assertRaises(ValueError):
+            choose_shortest_equivalent(())
+
+    def test_systematic_catalog_is_reproducible_unique_and_valid(self):
+        from knots_grid import SearchConfig
+        from knots_grid.catalog import canonical_key, generate_catalog
+
+        config = SearchConfig(min_search_steps=1, max_search_steps=3)
+        first = generate_catalog(8, mode="systematic", config=config)
+        second = generate_catalog(8, mode="systematic", config=config)
+
+        self.assertEqual(first, second)
+        self.assertEqual(len({canonical_key(entry.points) for entry in first}), 8)
+        self.assertTrue(all(validate_cycle(entry.points).is_valid for entry in first))
+
+
 if __name__ == "__main__":
     unittest.main()
