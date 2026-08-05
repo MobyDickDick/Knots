@@ -61,6 +61,27 @@ class SearchConfig:
             raise ValueError("layer_probability must be between 0 and 1")
 
 
+@dataclass(frozen=True, slots=True)
+class TravelConfig:
+    """Settings for permutation-based grid-diagram generation.
+
+    The generator chooses ``point_count`` X/O marker pairs on a square grid.
+    Each marker row and each marker column is used exactly once, which is the
+    grid-diagram analogue of assigning every prescribed waypoint its own x- and
+    y-coordinate.  Random permutations are tried up to ``max_attempts`` times
+    until their horizontal-then-vertical travel describes one closed component.
+    """
+
+    point_count: int = 10
+    max_attempts: int = 500
+
+    def __post_init__(self) -> None:
+        if self.point_count < 2:
+            raise ValueError("point_count must be at least 2")
+        if self.max_attempts < 1:
+            raise ValueError("max_attempts must be at least 1")
+
+
 def trefoil_candidate() -> TraceResult:
     """Construct a genuine trefoil from its minimal 5x5 grid diagram.
 
@@ -209,6 +230,40 @@ def search_candidates(
     return tuple(_search_candidate(random, config) for _ in range(count))
 
 
+def travel_candidate(
+    *,
+    seed: int | None = None,
+    config: TravelConfig = TravelConfig(),
+) -> TraceResult:
+    """Generate a closed candidate by trying random travels through markers.
+
+    This strategy avoids the previous open-ended local modification loop.  It
+    first creates two random permutations of ``point_count`` grid columns: one
+    permutation for X markers and one for O markers.  Because both permutations
+    use every row/column once, no two marker waypoints share an x- or
+    y-coordinate.  The resulting grid diagram routes horizontally on layer 0
+    and vertically on layer 1, so projected crossings get deterministic
+    over/under information instead of invalid same-layer intersections.
+    """
+
+    return _travel_candidate(Random(seed), config)
+
+
+def travel_candidates(
+    count: int,
+    *,
+    seed: int | None = None,
+    config: TravelConfig = TravelConfig(),
+) -> tuple[TraceResult, ...]:
+    """Generate ``count`` permutation-travel candidates from one random stream."""
+
+    if count < 0:
+        raise ValueError("count must be non-negative")
+
+    random = Random(seed)
+    return tuple(_travel_candidate(random, config) for _ in range(count))
+
+
 def _generate_candidate(random: Random, config: GeneratorConfig) -> TraceResult:
     width = random.randint(config.min_side_length, config.max_side_length)
     height = random.randint(config.min_side_length, config.max_side_length)
@@ -229,6 +284,29 @@ def _generate_candidate(random: Random, config: GeneratorConfig) -> TraceResult:
             parts.append(side_code)
 
     return make_candidate("".join(parts))
+
+
+def _travel_candidate(random: Random, config: TravelConfig) -> TraceResult:
+    columns = list(range(config.point_count))
+
+    for _ in range(config.max_attempts):
+        x_columns = columns.copy()
+        o_columns = columns.copy()
+        random.shuffle(x_columns)
+        random.shuffle(o_columns)
+
+        if any(x_column == o_column for x_column, o_column in zip(x_columns, o_columns)):
+            continue
+
+        try:
+            return _grid_diagram_candidate(tuple(x_columns), tuple(o_columns))
+        except ValueError:
+            continue
+
+    raise RuntimeError(
+        "could not find a one-component crossing-safe travel diagram "
+        f"after {config.max_attempts} attempts"
+    )
 
 
 def _search_candidate(random: Random, config: SearchConfig) -> TraceResult:

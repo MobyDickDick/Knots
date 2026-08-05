@@ -185,6 +185,36 @@ class GeneratorTests(unittest.TestCase):
         self.assertEqual(len(batch), 4)
         self.assertTrue(all(validate_cycle(candidate.points).is_valid for candidate in batch))
 
+    def test_travel_generation_uses_requested_marker_count(self):
+        from knots_grid import TravelConfig, find_crossings, travel_candidate
+
+        candidate = travel_candidate(seed=2026, config=TravelConfig(point_count=10))
+
+        self.assertEqual(candidate.points[0], Point(0, 0, 0))
+        self.assertEqual(candidate.points[-1], Point(0, 0, 0))
+        self.assertEqual(candidate.code.count("3"), 20)
+        self.assertGreaterEqual(len(find_crossings(candidate.points)), 1)
+        self.assertTrue(validate_cycle(candidate.points).is_valid)
+
+    def test_travel_generation_is_reproducible_and_rejects_bad_config(self):
+        from knots_grid import TravelConfig, travel_candidate, travel_candidates
+
+        config = TravelConfig(point_count=10)
+        self.assertEqual(
+            travel_candidate(seed=11, config=config),
+            travel_candidate(seed=11, config=config),
+        )
+        self.assertEqual(
+            travel_candidates(3, seed=11, config=config),
+            travel_candidates(3, seed=11, config=config),
+        )
+        with self.assertRaises(ValueError):
+            TravelConfig(point_count=1)
+        with self.assertRaises(ValueError):
+            TravelConfig(max_attempts=0)
+        with self.assertRaises(ValueError):
+            travel_candidates(-1)
+
     def test_search_rejects_invalid_configuration(self):
         from knots_grid import SearchConfig, search_candidates
 

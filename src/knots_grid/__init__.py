@@ -4,6 +4,7 @@ from .core import Direction, Point, TraceResult, trace_turtle
 from .generator import (
     GeneratorConfig,
     SearchConfig,
+    TravelConfig,
     generate_candidate,
     generate_candidates,
     make_candidate,
@@ -11,6 +12,8 @@ from .generator import (
     search_candidates,
     trefoil_candidate,
     torus_knot_candidate,
+    travel_candidate,
+    travel_candidates,
 )
 from .png import render_png
 from .reidemeister import Crossing, ReidemeisterReport, find_crossings, reidemeister_conditions
@@ -25,6 +28,7 @@ __all__ = [
     "ReidemeisterReport",
     "SearchConfig",
     "TraceResult",
+    "TravelConfig",
     "ValidationResult",
     "generate_candidate",
     "generate_candidates",
@@ -34,6 +38,8 @@ __all__ = [
     "search_candidates",
     "trefoil_candidate",
     "torus_knot_candidate",
+    "travel_candidate",
+    "travel_candidates",
     "reidemeister_conditions",
     "render_svg",
     "render_png",

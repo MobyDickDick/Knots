@@ -305,3 +305,26 @@ die genannten exakten Gittersymmetrien. Eine vollständige Entscheidung der
 Reidemeister- beziehungsweise Knotenäquivalenz ist damit ausdrücklich noch
 nicht geleistet. Die Funktion zur Repräsentantenwahl setzt deshalb voraus,
 dass die Äquivalenz der übergebenen Knoten zuvor bewiesen wurde.
+
+## Alternative Generationsstrategie: Reisen durch eindeutige Punkte
+
+Neben Rechtecken und lokaler Suche gibt es nun eine bounded Strategie, die nicht
+mehr in einem unbeschränkten Verbesserungsversuch hängen bleibt. Sie wählt eine
+feste Anzahl von Marker-Punkten (standardmäßig 10), verwendet jede x- und jede
+y-Komponente genau einmal und probiert eine begrenzte Teilliste zufälliger Reisen
+durch diese Punkte. Horizontale Teilstücke liegen auf Ebene `z=0`, vertikale
+Teilstücke auf Ebene `z=1`; dadurch werden Projektionstreffer zu kontrollierten
+Über-/Unterkreuzungen statt zu verbotenen Überschneidungen auf derselben Ebene.
+
+```python
+from knots_grid import TravelConfig, travel_candidate, travel_candidates
+
+config = TravelConfig(point_count=10, max_attempts=500)
+candidate = travel_candidate(seed=2026, config=config)
+batch = travel_candidates(5, seed=2026, config=config)
+```
+
+Der erzeugte Turtle-Trace beginnt und endet weiterhin bei `(0, 0, 0)`. Wenn
+innerhalb von `max_attempts` keine einkomponentige geschlossene Reise gefunden
+wird, bricht der Generator mit einer klaren Fehlermeldung ab, statt endlos zu
+suchen.
