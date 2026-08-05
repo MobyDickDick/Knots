@@ -1,7 +1,7 @@
 """Tools for lattice knots in Z^2 x {0, 1}."""
 
 from .checker import CheckReport, check_knot
-from .generator import generate, layered, ornamental, rectangle
+from .generator import generate, layered, ornamental, rectangle, travel
 from .model import Knot, Point
 from .optimizer import OptimizationResult, OptimizationStep, optimize
 from .visualize import save_svg, to_svg
@@ -20,4 +20,5 @@ __all__ = [
     "rectangle",
     "save_svg",
     "to_svg",
+    "travel",
 ]

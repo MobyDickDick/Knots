@@ -8,7 +8,7 @@ from typing import Literal
 from .checker import check_knot
 from .model import Knot, Point
 
-PresetName = Literal["unknot", "ornamental", "layered"]
+PresetName = Literal["unknot", "ornamental", "layered", "travel"]
 
 
 def rectangle(width: int = 6, height: int = 4, *, z: int = 0, name: str = "unknot") -> Knot:
@@ -50,6 +50,20 @@ def layered(seed: int = 11, *, expansions: int = 10, lifts: int = 10) -> Knot:
     return Knot(knot.points, name="layered")
 
 
+def travel(seed: int = 11, *, point_count: int = 10, max_attempts: int = 500) -> Knot:
+    """Create a bounded grid-diagram travel through unique x/y marker points."""
+
+    from knots_grid import TravelConfig, travel_candidate
+
+    trace = travel_candidate(
+        seed=seed,
+        config=TravelConfig(point_count=point_count, max_attempts=max_attempts),
+    )
+    knot = Knot([(point.x, point.y, point.z) for point in trace.points[:-1]], name="travel")
+    check_knot(knot).raise_for_errors()
+    return knot
+
+
 def generate(preset: PresetName = "layered", *, seed: int = 11) -> Knot:
     """Generate one of the named example families."""
 
@@ -59,6 +73,8 @@ def generate(preset: PresetName = "layered", *, seed: int = 11) -> Knot:
         return ornamental(seed=seed)
     if preset == "layered":
         return layered(seed=seed)
+    if preset == "travel":
+        return travel(seed=seed)
     raise ValueError(f"Unknown preset: {preset!r}.")
 
 
