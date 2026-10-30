@@ -83,6 +83,14 @@ class TravelConfig:
             raise ValueError("max_attempts must be at least 1")
 
 
+def figure_eight_candidate() -> TraceResult:
+    """Knot Atlas 4_1 arc presentation, converted to X/O columns by row.
+
+    Source: https://katlas.org/wiki/4_1 (six arcs, not a minimal projection).
+    """
+    return _grid_diagram_candidate((2, 5, 4, 0, 1, 3), (4, 3, 1, 2, 5, 0))
+
+
 def trefoil_candidate() -> TraceResult:
     """Construct a genuine trefoil from its minimal 5x5 grid diagram.
 

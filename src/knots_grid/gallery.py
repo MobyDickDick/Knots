@@ -39,6 +39,12 @@ def _preview_svg(points, name: str) -> str:
     return "".join(lines) + "</g></svg>"
 
 
+def _display_name(entry, index):
+    if entry.knot_name == "unknown":
+        return f"Kandidat {index + 1:03d} · ungeklärt"
+    return "0₁ · Unknoten" if entry.knot_name == "0_1" else entry.knot_name
+
+
 def render_gallery(entries: Iterable[CatalogEntry], filename: str | Path) -> Path:
     """Write a self-contained, rotatable gallery without changing knot points.
 
@@ -57,6 +63,22 @@ def render_gallery(entries: Iterable[CatalogEntry], filename: str | Path) -> Pat
             "crossings": len(find_crossings(entry.points)),
             "points": [[p.x, p.y, p.z] for p in entry.points],
         })
+        if entry.original_points is not None:
+            validate_cycle(entry.original_points).raise_for_errors()
+            metadata = entry.metadata
+            if metadata:
+                # Generator seeds use 63 bits; JavaScript numbers only retain
+                # 53 integer bits. Keep their displayed provenance exact.
+                provenance = dict(metadata["provenance"])
+                for key in ("seed", "candidate_seed"):
+                    if provenance.get(key) is not None:
+                        provenance[key] = str(provenance[key])
+                metadata = {**metadata, "provenance": provenance}
+            records[-1].update({
+                "original_points": [[p.x, p.y, p.z] for p in entry.original_points],
+                "original_crossings": len(find_crossings(entry.original_points)),
+                "metadata": metadata,
+            })
     if not records:
         raise ValueError("a gallery needs at least one knot")
 
@@ -71,7 +93,7 @@ def render_gallery(entries: Iterable[CatalogEntry], filename: str | Path) -> Pat
     cards = []
     static_catalog = []
     for index, (entry, record, preview) in enumerate(zip(entries, records, previews)):
-        name = escape("0₁ · Unknoten" if entry.knot_name == "0_1" else entry.knot_name)
+        name = escape(_display_name(entry, index))
         cards.append(
             f'<a class="knot-card" href="#static-knot-{index}" '
             f'aria-label="{escape(entry.knot_name, quote=True)} auswählen">{preview}'
@@ -81,12 +103,18 @@ def render_gallery(entries: Iterable[CatalogEntry], filename: str | Path) -> Pat
         static_catalog.append(
             f'<section id="static-knot-{index}"><h3>{name}</h3>{preview}</section>'
         )
+        if entry.original_points is not None:
+            original_preview = _preview_svg(entry.original_points, entry.knot_name + " · Original")
+            static_catalog[-1] = (
+                f'<section id="static-knot-{index}"><h3>{name} · Original</h3>'
+                f'{original_preview}<h3>{name} · Beste gefundene Darstellung</h3>{preview}</section>'
+            )
     replacements = {
         "__KNOT_DATA__": data,
         "__KNOT_CARDS__": "".join(cards),
         "__KNOT_COUNT__": str(len(entries)),
         "__SELECTED_NAME__": escape(
-            "0₁ · Unknoten" if entries[selected].knot_name == "0_1" else entries[selected].knot_name
+            _display_name(entries[selected], selected)
         ),
         "__SELECTED_PREVIEW__": previews[selected],
         "__STATIC_CATALOG__": "".join(static_catalog),

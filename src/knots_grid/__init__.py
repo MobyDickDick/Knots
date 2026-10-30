@@ -3,6 +3,7 @@
 from .core import Direction, Point, TraceResult, trace_turtle
 from .generator import (
     GeneratorConfig,
+    figure_eight_candidate,
     SearchConfig,
     TravelConfig,
     generate_candidate,
@@ -36,6 +37,7 @@ __all__ = [
     "TravelConfig",
     "ValidationResult",
     "generate_candidate",
+    "figure_eight_candidate",
     "generate_candidates",
     "find_crossings",
     "make_candidate",

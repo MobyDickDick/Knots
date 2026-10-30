@@ -140,12 +140,23 @@ Ziel:
 
 - [x] flache Kreuzungen samt Über-/Unterinformation aus $z$ bestimmen,
 - [x] notwendige Gauss-Wort-Bedingungen für Reidemeister I--III erkennen,
-- [ ] geometrisch leere Zugregionen prüfen und Züge tatsächlich ausführen,
-- [ ] einfache Knoteninvarianten ergänzen.
+- [ ] geometrisch leere Reidemeister-Zugregionen prüfen und die direkten
+  Reidemeister-I--III-Züge tatsächlich ausführen,
+- [x] als konservative Grundlage geometrisch leere lokale Gitterflächen prüfen
+  und knotentyp-erhaltende Flächenzüge ausführen (`optimization.py`, mit Replay-Protokoll),
+- [x] die Knotendeterminante aus der Fox-Färbungsmatrix exakt berechnen
+  (`classification.py`).
+
+Weiterer Ausbau: direkte, allgemeine Reidemeister-I--III-Züge anhand der
+Gauss-Kandidaten. Der aktuelle geometrische Zugmotor verwendet freie
+Einheitsquadrate im Raum (3→1 und 2→2). Er führt keine ungeprüften
+Gauss-Kandidaten aus und ist kein vollständiger Reidemeister-Entscheider.
 
 ## Arbeitspaket AP-01: Generator-Pipeline bis zur Galerie
 
-Status: **offen – nächstes Arbeitspaket**.
+Status: **weitgehend umgesetzt am 30.10.2026 – direkte Reidemeister-I--III-Züge
+noch offen**. Die durchgängige Pipeline mit konservativer Referenzklassifikation
+und begrenzter Optimierung über freie Gitterflächen ist verfügbar.
 
 Ziel: Den vorhandenen experimentellen Generator mit Knotenprüfung, kontrollierter
 Duplikaterkennung, Optimierung und Galerieexport verbinden. Die Sammlung soll
@@ -164,13 +175,13 @@ Kandidaten generieren
 
 Teilaufgaben in Umsetzungsreihenfolge:
 
-- [ ] `travel_candidates(...)` als alternative Quelle an den Katalog anbinden;
+- [x] `travel_candidates(...)` als alternative Quelle an den Katalog anbinden;
   Seed, Generatorparameter und Versuchslimit konfigurierbar machen.
-- [ ] Klassifikation aus Kreuzungsdaten und geeigneten Knoteninvarianten
+- [x] Klassifikation aus Kreuzungsdaten und geeigneten Knoteninvarianten
   ergänzen. Bekannte Referenzknoten zur Prüfung verwenden, darunter auch
   Knotentypen außerhalb der Torusknotenfamilie. Nicht sicher zugeordnete
   Kandidaten ausdrücklich als `unknown` speichern.
-- [ ] Exakte Darstellungsduplikate und nachgewiesene Knotenäquivalenz getrennt
+- [x] Exakte Darstellungsduplikate und nachgewiesene Knotenäquivalenz getrennt
   behandeln. Gleiche Invarianten allein dürfen keine Äquivalenz begründen;
   ungeklärte Kandidaten bleiben erhalten. Den Umgang mit Spiegelbildern und
   Orientierung explizit festlegen.
@@ -178,28 +189,30 @@ Teilaufgaben in Umsetzungsreihenfolge:
   für die Optimierung implementieren und jede Änderung protokollieren.
   Primär die Zahl der Gitterpunkte minimieren; bei gleicher Länge weiterhin
   die bestehende Cantor-Reihenfolge verwenden. Ästhetische Bewertung separat
-  anzeigen und keine globale Minimalität behaupten.
-- [ ] Original und beste gefundene Darstellung mit Klassifikationsstatus,
+  anzeigen und keine globale Minimalität behaupten. Als Grundlage sind freie
+  Gitterflächen-Züge mit Punktzahl-/Cantor-Optimierung und vollständigem Protokoll
+  umgesetzt; die direkten Reidemeister-Züge sind noch zu ergänzen.
+- [x] Original und beste gefundene Darstellung mit Klassifikationsstatus,
   Herkunft, Punktzahl vorher/nachher und angewandten Umformungen speichern.
-- [ ] Einen durchgängigen CLI-Aufruf für Generierung bis Galerieexport anbieten.
+- [x] Einen durchgängigen CLI-Aufruf für Generierung bis Galerieexport anbieten.
   Die Galerie um neu erzeugte Kandidaten und einen Original/Optimiert-Vergleich
   in 2-D und drehbarem 3-D erweitern.
 
 Abnahmekriterien:
 
-- [ ] Derselbe Seed mit denselben Parametern und Grenzen erzeugt dieselbe
+- [x] Derselbe Seed mit denselben Parametern und Grenzen erzeugt dieselbe
   Sammlung. Die Suche endet auch dann nach dem Versuchslimit mit einem klaren
   Ergebnisbericht, wenn die gewünschte Zahl unterscheidbarer Knoten nicht
   erreicht wird.
-- [ ] Jeder gespeicherte Ausgangs- und Ergebnispfad besteht die Validierung;
+- [x] Jeder gespeicherte Ausgangs- und Ergebnispfad besteht die Validierung;
   Ebenen außerhalb von `z=0` und `z=1` sind ausgeschlossen.
-- [ ] Tests decken bekannte Knotentypen, äquivalente Darstellungen,
+- [x] Tests decken bekannte Knotentypen, äquivalente Darstellungen,
   nicht äquivalente Beispiele und ungeklärte Klassifikationen ab. Ein
   Knotennamen- oder Eindeutigkeitsversprechen benötigt nachvollziehbare Evidenz.
-- [ ] Optimierte Ergebnisse sind nicht länger als ihre Ausgangspfade. Die
+- [x] Optimierte Ergebnisse sind nicht länger als ihre Ausgangspfade. Die
   Äquivalenz ergibt sich aus den abgesicherten Umformungen, nicht allein aus
   unveränderten Invarianten oder einem besseren ästhetischen Score.
-- [ ] Ein vollständiger Beispieldurchlauf liefert eine gespeicherte Sammlung
+- [x] Ein vollständiger Beispieldurchlauf liefert eine gespeicherte Sammlung
   und eine offline nutzbare Galerie mit auswählbaren Originalen und Ergebnissen.
 
 Betroffene Bereiche: `generator.py`, `reidemeister.py`, `catalog.py`,
@@ -207,6 +220,45 @@ Betroffene Bereiche: `generator.py`, `reidemeister.py`, `catalog.py`,
 Optimierungsmodule nach Bedarf. Die offenen Prüf- und Umformungsaufgaben aus
 Modul 5 sind Bestandteil dieses Arbeitspakets. Der Bild-Abzeichner bleibt ein
 späteres, separates Vorhaben.
+
+Umsetzung und Grenzen:
+
+- `pipeline.py` verbindet die Reisequelle mit `classification.py`,
+  `optimization.py`, Katalogexport und Galerie. Pro Seed gilt das innere
+  `travel-attempts`-Limit; für die Sammlung gilt zusätzlich `max-attempts`.
+  `report.json` dokumentiert auch unvollständige Suchen und verworfene Kandidaten.
+- Die Determinante ist ein exakter erster Minor der Fox-Matrix. Namen werden
+  ausschließlich durch vollständige signierte Diagrammvergleiche mit
+  Referenzen belegt (Unknoten, `T(2,3)` bis `T(2,15)`, deren Spiegel und der
+  Achterknoten `4_1`). Ein gleicher Determinantenwert genügt niemals.
+- Orientierung wird ignoriert. Spiegel bleiben getrennt, außer bei den als
+  amphichiral bekannten Referenzen `0_1` und `4_1`. Die neue Pipeline verwendet
+  daher nur Drehungen bei der Kanonisierung; das bisherige D4-Verhalten des
+  Toruskatalogs bleibt als Standard der alten API erhalten.
+- Die Optimierung prüft freie Einheitsquadrate in den Ebenen xy, xz und yz.
+  Jedes akzeptierte Ergebnis verbessert streng `(Punktzahl, Cantor-Folge)`;
+  alle Änderungen lassen sich mit `apply_face_move` wiederholen. Das
+  Bewegungsbudget begrenzt die Suche. Auch innerhalb belegter Äquivalenzklassen
+  wird der kürzere beziehungsweise bei Gleichstand kleinere Repräsentant behalten.
+- `examples/travel_catalog/index.html` ist der vollständige Offline-Beispiellauf.
+  Original und Ergebnis sind in beiden Ansichten umschaltbar. Die Python-Tests
+  prüfen Validierung, Referenzen, Spiegel, ungeklärte Fälle, Grenzen, Zug-Replay
+  und bytegleiche Exporte. Der Node-Laufzeittest prüft zusätzlich die
+  Original-/Ergebnisumschaltung. Eine manuelle visuelle Browserabnahme war in
+  dieser Sitzung durch die Computer-Use-Browserrichtlinie nicht möglich.
+
+## Verbleibende Aufgabe in AP-01: direkte Reidemeister-Züge
+
+- [ ] Für die Gauss-Kandidaten aus `reidemeister_conditions` die zugehörigen
+  ebenen Ein-, Zwei- und Dreiecksregionen explizit rekonstruieren.
+- [ ] Deren Leerheit einschließlich der übrigen Stränge geometrisch prüfen
+  und direkte Gitterrealisierungen für Reidemeister I--III ergänzen.
+- [ ] Nicht ausführbare oder degenerierte Fälle begründet zurückgeben;
+  jede tatsächlich ausgeführte Änderung weiter mit einem Replay-Protokoll belegen.
+
+Diese Erweiterung soll über den begrenzten Flächenzugmotor hinausgehen und
+Klassifikation sowie Optimierung verbessern, ohne globale Minimalität oder
+vollständige Knotenerkennung zu versprechen.
 
 ## Modul 6: Bild-Abzeichner
 

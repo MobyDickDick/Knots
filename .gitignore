@@ -10,3 +10,6 @@ dist/
 build/
 *.svg
 *.json
+.test_tmp/
+!examples/travel_catalog/*.json
+!examples/travel_catalog/*.svg

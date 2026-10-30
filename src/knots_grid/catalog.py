@@ -49,11 +49,14 @@ def sequence_measure(points: Iterable[Point]) -> tuple[int, tuple[int, ...]]:
     return (len(pts), tuple(pseudo_cantor_index(point) for point in pts))
 
 
-def canonicalize_cycle(points: Iterable[Point]) -> tuple[Point, ...]:
+def canonicalize_cycle(
+    points: Iterable[Point], *, include_reflections: bool = True,
+) -> tuple[Point, ...]:
     """Return the smallest translated D4/cyclic representation of a cycle.
 
     Input may repeat the start point at the end; output always does so.  Layer
     values are retained because swapping layers may change over/under data.
+    Set include_reflections=False to preserve chirality (the new pipeline).
     """
 
     pts = tuple(points)
@@ -62,22 +65,26 @@ def canonicalize_cycle(points: Iterable[Point]) -> tuple[Point, ...]:
     body = pts[:-1]
 
     variants: list[tuple[tuple[int, tuple[int, ...]], tuple[Point, ...]]] = []
-    for transform in _square_symmetries():
+    for transform in _square_symmetries()[:8 if include_reflections else 4]:
         transformed = tuple(Point(*transform(point.x, point.y), point.z) for point in body)
         normalized = _translate_non_negative(transformed)
         for oriented in (normalized, tuple(reversed(normalized))):
-            for offset in range(len(oriented)):
-                rotated = oriented[offset:] + oriented[:offset]
-                closed = rotated + (rotated[0],)
-                variants.append((sequence_measure(rotated), closed))
+            # The bijective Cantor index has a unique minimum on a simple
+            # cycle. Only that cyclic start can win lexicographically.
+            offset = min(range(len(oriented)), key=lambda i: pseudo_cantor_index(oriented[i]))
+            rotated = oriented[offset:] + oriented[:offset]
+            closed = rotated + (rotated[0],)
+            variants.append((sequence_measure(rotated), closed))
 
     return min(variants, key=lambda item: item[0])[1]
 
 
-def canonical_key(points: Iterable[Point]) -> CanonicalKey:
+def canonical_key(points: Iterable[Point], *, include_reflections: bool = True) -> CanonicalKey:
     """Return a hashable key for exact grid-symmetry deduplication."""
 
-    return tuple((point.x, point.y, point.z) for point in canonicalize_cycle(points)[:-1])
+    return tuple((point.x, point.y, point.z) for point in canonicalize_cycle(
+        points, include_reflections=include_reflections,
+    )[:-1])
 
 
 def choose_shortest_equivalent(cycles: Iterable[Iterable[Point]]) -> tuple[Point, ...]:
@@ -102,11 +109,13 @@ class CatalogEntry:
     seed: int
     points: tuple[Point, ...]
     knot_name: str = "unknown"
-    determinant: int = 0
+    determinant: int | None = 0
+    original_points: tuple[Point, ...] | None = None
+    metadata: dict | None = None
 
     @property
     def measure(self) -> tuple[int, tuple[int, ...]]:
-        return sequence_measure(self.points[:-1])
+        return sequence_measure(canonicalize_cycle(self.points, include_reflections=False)[:-1])
 
 
 def generate_catalog(
@@ -176,6 +185,9 @@ def write_catalog(entries: Iterable[CatalogEntry], directory: str | Path) -> Pat
     target.mkdir(parents=True, exist_ok=True)
     records: list[dict[str, object]] = []
     for entry in entries:
+        validate_cycle(entry.points).raise_for_errors()
+        if entry.original_points is not None:
+            validate_cycle(entry.original_points).raise_for_errors()
         svg_filename = f"knot_{entry.index:03d}.svg"
         png_filename = f"knot_{entry.index:03d}.png"
         render_svg(entry.points, target / svg_filename)
@@ -200,6 +212,15 @@ def write_catalog(entries: Iterable[CatalogEntry], directory: str | Path) -> Pat
                 "points": [[p.x, p.y, p.z] for p in entry.points[:-1]],
             }
         )
+        if entry.original_points is not None:
+            original_svg = f"knot_{entry.index:03d}_original.svg"
+            render_svg(entry.original_points, target / original_svg)
+            records[-1].update({
+                "original_svg": original_svg,
+                "original_points": [[p.x, p.y, p.z] for p in entry.original_points[:-1]],
+                "original_point_count": len(entry.original_points) - 1,
+                "metadata": entry.metadata,
+            })
     manifest = target / "catalog.json"
     manifest.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
     if entries:
@@ -245,9 +266,31 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--count", type=int, default=100)
     parser.add_argument("--mode", choices=("random", "systematic"), default="random")
     parser.add_argument("--seed", type=int)
+    parser.add_argument("--source", choices=("torus", "travel"), default="torus")
+    parser.add_argument("--point-count", type=int, default=10)
+    parser.add_argument("--max-attempts", type=int)
+    parser.add_argument("--travel-attempts", type=int, default=500)
+    parser.add_argument("--max-moves", type=int, default=100)
     parser.add_argument("--output", type=Path, default=Path("knot_catalog"))
     args = parser.parse_args(argv)
-    entries = generate_catalog(args.count, mode=args.mode, seed=args.seed)
+    if args.source == "travel":
+        from .pipeline import generate_collection, write_collection
+        from .generator import TravelConfig
+
+        result = generate_collection(
+            args.count, mode=args.mode, seed=args.seed,
+            config=TravelConfig(args.point_count, args.travel_attempts),
+            max_attempts=500 if args.max_attempts is None else args.max_attempts,
+            max_moves=args.max_moves,
+        )
+        manifest = write_collection(result, args.output)
+        print(f"{result.status}: {len(result.entries)}/{args.count} entries; "
+              f"{result.attempts} attempts, {result.exact_duplicates} exact duplicates, "
+              f"{result.equivalent_duplicates} proven equivalents, "
+              f"{result.generator_failures} generator failures. Wrote {manifest}")
+        return 0
+    entries = generate_catalog(args.count, mode=args.mode, seed=args.seed,
+                               max_attempts=args.max_attempts)
     manifest = write_catalog(entries, args.output)
     print(f"Wrote {len(entries)} canonical candidates to {manifest}")
     return 0

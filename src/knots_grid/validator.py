@@ -56,11 +56,15 @@ def validate_cycle(points: tuple[Point, ...] | list[Point]) -> ValidationResult:
         errors.append("path is not closed: first point differs from last point")
 
     for index, point in enumerate(pts):
+        if any(type(value) is not int for value in (point.x, point.y, point.z)):
+            errors.append(f"point {index} must have integer coordinates")
         if point.z not in (0, 1):
             errors.append(f"point {index} has invalid layer z={point.z!r}")
 
     seen: dict[Point, int] = {}
     interior = pts[:-1] if pts[0] == pts[-1] else pts
+    if len(interior) < 4:
+        errors.append("a simple lattice cycle needs at least four distinct vertices")
     for index, point in enumerate(interior):
         previous = seen.get(point)
         if previous is not None:

@@ -411,3 +411,76 @@ Der erzeugte Turtle-Trace beginnt und endet weiterhin bei `(0, 0, 0)`. Wenn
 innerhalb von `max_attempts` keine einkomponentige geschlossene Reise gefunden
 wird, bricht der Generator mit einer klaren Fehlermeldung ab, statt endlos zu
 suchen.
+
+## Reisegenerator bis zur Galerie (AP-01)
+
+Ein Aufruf erzeugt jetzt eine Sammlung aus Reise-Kandidaten, prüft ihre
+Kreuzungsdiagramme, entfernt belegte Duplikate, vereinfacht die Gitterpfade
+und exportiert Original und Ergebnis mit einer Offline-Galerie:
+
+```bash
+python -m knots_grid.catalog --source travel --count 8 --seed 2026 --point-count 10 --max-attempts 40 --travel-attempts 500 --max-moves 100 --output examples/travel_catalog
+```
+
+Die fertige Galerie ist `examples/travel_catalog/index.html`. Die Schalter
+**Original** und **Beste gefunden** funktionieren sowohl in 2-D als auch in der
+drehbaren 3-D-Ansicht. Angezeigt werden Punktzahlen vorher/nachher, Anzahl der
+Umformungen, Seed, Klassifikationsevidenz und eine separate ästhetische Bewertung.
+Ungeklärte Einträge heißen in der Ansicht „Kandidat … · ungeklärt“ und werden
+in den Daten ausdrücklich als `unknown` gespeichert.
+
+Der Export enthält:
+
+- `catalog.json`: Ausgangs- und Ergebnispunkte, Klassifikation, Herkunft,
+  Kennzahlen und ein einzeln wiederholbares Änderungsprotokoll;
+- `report.json`: Suchgrenzen, Anzahl der Versuche, Generatorfehler sowie
+  getrennte Zähler für exakte und nachweislich äquivalente Duplikate;
+- SVG-Dateien für Original und Ergebnis, PNG-Vorschauen und `index.html`.
+
+`--point-count` bestimmt die Anzahl der X/O-Markerpaare. `--travel-attempts`
+begrenzt die innere Suche pro Seed, `--max-attempts` die Zahl der Kandidaten-Seeds
+und `--max-moves` die Vereinfachung pro Kandidat. Reicht das Versuchslimit
+nicht aus, werden die Teilsammlung und der Status `attempt_limit` gespeichert.
+Gleiche Seeds, Parameter und Grenzen erzeugen dieselben Daten und Exporte.
+Der Standard `--source torus` erhält den bisherigen konstruierten Katalog.
+
+Die Knotendeterminante wird exakt aus der Fox-Färbungsmatrix berechnet. Ein
+Knotenname wird nur bei einer kreuzungsfreien regulären Projektion oder einem
+vollständigen signierten Diagrammvergleich mit einer Referenz vergeben.
+Referenzen sind `T(2,3)` bis `T(2,15)` einschließlich ihrer Spiegel und der
+Achterknoten `4_1`. Dessen Gitterdarstellung stammt aus der
+[Sechs-Bogen-Darstellung im Knot Atlas](https://katlas.org/wiki/4_1).
+Die Fox-Matrix und ihre Minoren sind in den
+[Vorlesungsnotizen von Danny Calegari](https://math.uchicago.edu/~dannyc/notes/knot_theory.pdf)
+beschrieben. Ein gleicher Invariantenwert allein begründet keine Äquivalenz:
+auch ungeklärte Kandidaten mit derselben Determinante bleiben erhalten.
+Die Sammlung verspricht daher keine paarweise verschiedenen Knotentypen.
+
+Die neue Pipeline ignoriert die Durchlaufrichtung, erhält aber Spiegelbilder
+als getrennte Klassen; Ausnahmen sind die belegten amphichiralen Referenzen
+Unknoten und Achterknoten. Zur Duplikatsuche werden Translation, zyklischer
+Start, Umkehrung und Drehungen des Gitters entfernt. Spiegelungen gehören
+weiterhin zur alten D4-Kanonisierung, werden in der neuen Pipeline aber
+ausdrücklich ausgeschaltet.
+
+Die Optimierung bewegt den Pfad ausschließlich über nachweislich freie
+Einheitsquadrate im räumlichen Gitter. Drei Kanten können durch eine ersetzt
+werden; zwei durch die beiden anderen Quadratseiten. Weil Einheits-Gitterkanten
+das Innere eines solchen Quadrats nicht durchstoßen können und die neue
+Randbelegung geprüft wird, liegt für jede Änderung eine lokale Isotopie vor.
+Das Protokoll lässt sich mit `knots_grid.optimization.apply_face_move` erneut
+prüfen und ausführen. Minimiert wird zuerst die Punktzahl, danach die
+Cantor-Folge; die ästhetische Bewertung entscheidet nicht über Vereinfachung
+oder Äquivalenz. Eine bereits aus der Originalprojektion bekannte Determinante
+bleibt auch bei einer degenerierten Ergebnisprojektion erhalten.
+
+Dies ist eine begrenzte lokale Optimierung. Allgemeine direkte
+Reidemeister-I--III-Züge und eine globale Minimalitätsentscheidung sind damit
+weiterhin nicht implementiert; die Gauss-Wort-Kandidaten werden nicht ungeprüft
+ausgeführt. Der nächste Ausbau ist in `docs/project_plan.md` dokumentiert.
+
+Zusätzliche Laufzeitprüfung für die Vergleichsansicht:
+
+```bash
+node tests/test_gallery_runtime.cjs examples/travel_catalog/index.html
+```

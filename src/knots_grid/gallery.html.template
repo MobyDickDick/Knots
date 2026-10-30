@@ -83,6 +83,7 @@ button:focus-visible,input:focus-visible,canvas:focus-visible { outline:3px soli
 <div class="modes" role="group" aria-label="Darstellung"><button id="mode-2d" disabled aria-pressed="true">2-D · Dein Format</button><button id="mode-3d" disabled aria-pressed="false">3-D · Drehbar</button></div></div>
 <div class="stage"><div class="stage-tag" id="stage-label"></div><div id="static-preview">__SELECTED_PREVIEW__</div><canvas id="scene" hidden tabindex="0" aria-label="Drehbare Knotendarstellung"></canvas></div>
 <div class="toolbar">
+<div class="modes" id="version-control" role="group" aria-label="Original oder optimiert" hidden><button id="version-original" disabled aria-pressed="false">Original</button><button id="version-best" disabled aria-pressed="true">Beste gefunden</button></div>
 <label><input id="grid" disabled type="checkbox" checked> Gitter</label>
 <label id="gap-control">Schichtabstand <input id="gap" disabled type="range" min="0.5" max="4" value="1" step="0.1"><output id="gap-value">1,0</output></label>
 <button id="reset" disabled>Ansicht zurücksetzen</button>
@@ -90,6 +91,7 @@ button:focus-visible,input:focus-visible,canvas:focus-visible { outline:3px soli
 <div class="legend"><span><i class="swatch" style="--color:var(--blue)"></i>Schicht 0</span><span><i class="swatch" style="--color:var(--green)"></i>Schicht 1</span><span><i class="swatch" style="--color:var(--red)"></i>Ebenenwechsel</span></div>
 </div>
 <div class="details" id="details" aria-live="polite"></div>
+<p id="classification-evidence" class="note" hidden></p>
 <p id="help"></p>
 <div id="static-catalog">__STATIC_CATALOG__</div>
 </section>
@@ -102,7 +104,7 @@ button:focus-visible,input:focus-visible,canvas:focus-visible { outline:3px soli
   'use strict';
   const $ = id => document.getElementById(id);
   const staticCards = Array.from($('knots').children);
-  const controlIds=['mode-2d','mode-3d','grid','gap','reset'];
+  const controlIds=['mode-2d','mode-3d','grid','gap','reset','version-original','version-best'];
   function showStartupError(error) {
     controlIds.forEach(id=>{$(id).disabled=true;});
     $('knots').replaceChildren(...staticCards);
@@ -120,8 +122,10 @@ button:focus-visible,input:focus-visible,canvas:focus-visible { outline:3px soli
   let selected = knots.length > 1 ? 1 : 0;
   let mode = '3d', yaw = -0.5, tilt = 0.9, zoom = 1;
   let drag = null;
+  let version = 'best';
   const cards = [];
   const offset = Math.SQRT2 / 2;
+  const displayName=(knot,index)=>knot.name==='unknown'?'Kandidat '+String(index+1).padStart(3,'0')+' · ungeklärt':knot.name==='0_1'?'0₁ · Unknoten':knot.name;
 
   function bounds(points) {
     return points.reduce((b, p) => [Math.min(b[0],p[0]), Math.max(b[1],p[0]), Math.min(b[2],p[1]), Math.max(b[3],p[1])], [Infinity,-Infinity,Infinity,-Infinity]);
@@ -174,7 +178,12 @@ button:focus-visible,input:focus-visible,canvas:focus-visible { outline:3px soli
       stroke(edge.a,edge.b,edge.color,lineWidth);
     }
   }
-  function redraw() { draw(scene,knots[selected],mode==='2d'); }
+  function activeKnot() {
+    const knot=knots[selected];
+    return version==='original' && knot.original_points
+      ? {...knot, points:knot.original_points, crossings:knot.original_crossings} : knot;
+  }
+  function redraw() { draw(scene,activeKnot(),mode==='2d'); }
   function refreshMode() {
     $('mode-2d').setAttribute('aria-pressed',String(mode==='2d'));
     $('mode-3d').setAttribute('aria-pressed',String(mode==='3d'));
@@ -189,9 +198,23 @@ button:focus-visible,input:focus-visible,canvas:focus-visible { outline:3px soli
     selected=index;
     cards.forEach((card,i)=>card.setAttribute('aria-pressed',String(i===selected)));
     const knot=knots[selected];
-    $('selected-name').textContent=knot.name==='0_1'?'0₁ · Unknoten':knot.name;
+    $('version-control').hidden=!knot.original_points;
+    $('version-original').setAttribute('aria-pressed',String(version==='original'));
+    $('version-best').setAttribute('aria-pressed',String(version==='best'));
+    $('selected-name').textContent=displayName(knot,selected);
     $('details').replaceChildren();
-    for(const [label,value] of [['Kreuzungen',knot.crossings],['Gitterkanten',knot.points.length-1],['Determinante',knot.determinant]]) {
+    const active=activeKnot();
+    const values=[['Kreuzungen',active.crossings],['Gitterkanten',active.points.length-1],['Determinante',knot.determinant ?? 'ungeklärt']];
+    if(knot.metadata) {
+      const m=knot.metadata;
+      values.push(['Punkte vorher → nachher',m.point_count_before+' → '+m.point_count_after],
+        ['abgesicherte Umformungen',m.moves.length],['Seed',m.provenance.candidate_seed],
+        ['ästhetischer Wert',Number(version==='original'?m.aesthetic_before.total:m.aesthetic_after.total).toFixed(2)]);
+      $('classification-evidence').hidden=false;
+      $('classification-evidence').textContent=(m.classification.status==='certified'?'Belegt: ':'Ungeklärt: ')+m.classification.evidence+
+        '. Original und Ergebnis sind durch protokollierte Umformungen äquivalent. Keine globale Minimalität; gleiche Invarianten beweisen keine Knotenäquivalenz.';
+    } else $('classification-evidence').hidden=true;
+    for(const [label,value] of values) {
       const span=document.createElement('span'), strong=document.createElement('strong');
       strong.textContent=String(value);span.append(strong,document.createTextNode(' '+label));$('details').append(span);
     }
@@ -202,12 +225,14 @@ button:focus-visible,input:focus-visible,canvas:focus-visible { outline:3px soli
     const card=document.createElement('button');card.className='knot-card';card.type='button';
     card.setAttribute('aria-pressed','false');card.setAttribute('aria-label',knot.name+' auswählen');
     const canvas=document.createElement('canvas');canvas.setAttribute('aria-hidden','true');
-    const name=document.createElement('span');name.className='knot-name';name.textContent=knot.name==='0_1'?'0₁ · Unknoten':knot.name;
+    const name=document.createElement('span');name.className='knot-name';name.textContent=displayName(knot,index);
     const caption=document.createElement('span');caption.className='knot-caption';caption.textContent=knot.crossings+' Kreuzungen';
     card.append(canvas,name,caption);card.addEventListener('click',()=>choose(index));cards.push(card);
   });
   $('mode-2d').addEventListener('click',()=>{mode='2d';zoom=1;refreshMode();});
   $('mode-3d').addEventListener('click',()=>{mode='3d';zoom=1;refreshMode();});
+  $('version-original').addEventListener('click',()=>{version='original';choose(selected);});
+  $('version-best').addEventListener('click',()=>{version='best';choose(selected);});
   $('grid').addEventListener('change',redraw);
   $('gap').addEventListener('input',()=>{$('gap-value').textContent=Number($('gap').value).toFixed(1).replace('.',',');redraw();});
   $('reset').addEventListener('click',()=>{yaw=-0.5;tilt=0.9;zoom=1;$('gap').value='1';$('gap-value').textContent='1,0';redraw();});

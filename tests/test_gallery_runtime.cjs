@@ -97,6 +97,20 @@ assert.ok(drawings > 0);
 assert.equal(elements['mode-3d'].attributes['aria-pressed'], 'true');
 
 const initial = snapshot();
+const selectedKnot=knots[knots.length>1?1:0];
+if(selectedKnot.original_points) {
+  assert.equal(elements['version-control'].hidden,false);
+  elements['version-original'].fire('click');
+  assert.equal(elements['version-original'].attributes['aria-pressed'],'true');
+  assert.ok(elements.details.children.some(child=>child.children.some(
+    item=>item.textContent===String(selectedKnot.original_points.length-1))), 'original point count displayed');
+  if(JSON.stringify(selectedKnot.original_points)!==JSON.stringify(selectedKnot.points)) {
+    assert.notEqual(snapshot(),initial,'original toggle draws original coordinates');
+  }
+  elements['version-best'].fire('click');
+  assert.equal(snapshot(),initial,'best toggle restores result coordinates');
+  assert.equal(elements['classification-evidence'].hidden,false);
+}
 scene.fire('pointerdown', {clientX:100,clientY:100,pointerId:1});
 scene.fire('pointermove', {clientX:170,clientY:140,pointerId:1});
 assert.notEqual(snapshot(), initial, 'drag rotates the drawing');
@@ -130,7 +144,7 @@ assert.equal(scene.fire('keydown', {key:'ArrowLeft'}), false);
 
 cards[0].fire('click');
 assert.equal(cards[0].attributes['aria-pressed'], 'true');
-assert.equal(elements['selected-name'].textContent, '0₁ · Unknoten');
+assert.equal(elements['selected-name'].textContent, knots[0].name==='unknown'?'Kandidat 001 · ungeklärt':knots[0].name==='0_1'?'0₁ · Unknoten':knots[0].name);
 elements.grid.checked = false;
 elements.grid.fire('change');
 assert.equal(scene.context.lines.length, 2*(knots[0].points.length-1), 'grid toggle leaves every knot edge');
