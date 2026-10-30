@@ -109,7 +109,7 @@ Erste Stufe (umgesetzt):
 Nächste Stufe:
 
 - [x] reproduzierbare lokale Suche mit rechteckigen Umwegen und Kanten-Lifts ergänzen,
-- [ ] Bewertungsfunktion für schöne Projektionen einführen.
+- [x] Bewertungsfunktion für schöne Projektionen einführen (Kennzahlen, konfigurierbare Gewichte und reproduzierbare Bestenauswahl).
 - [x] echten Trefoil über ein 5x5-Grid-Diagramm konstruieren.
 
 Mögliche Kriterien:

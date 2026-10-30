@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from random import Random
 
 from .core import Direction, Point, TraceResult, trace_turtle
+from .projection import ProjectionWeights, score_projection
 from .validator import validate_cycle
 
 
@@ -207,6 +208,29 @@ def search_candidates(
 
     random = Random(seed)
     return tuple(_search_candidate(random, config) for _ in range(count))
+
+
+def search_best_candidate(
+    sample_count: int = 20,
+    *,
+    seed: int | None = None,
+    config: SearchConfig = SearchConfig(),
+    weights: ProjectionWeights = ProjectionWeights(),
+) -> TraceResult:
+    """Return the highest-scoring drawing from a reproducible search batch.
+
+    Ties prefer the first generated candidate. The batch uses exactly the same
+    random stream as ``search_candidates(sample_count, seed=seed, config=config)``.
+    Aesthetic selection does not establish knot type or minimality.
+    """
+
+    if sample_count < 1:
+        raise ValueError("sample_count must be at least 1")
+    candidates = search_candidates(sample_count, seed=seed, config=config)
+    return max(
+        candidates,
+        key=lambda candidate: score_projection(candidate.points, weights=weights).total,
+    )
 
 
 def _generate_candidate(random: Random, config: GeneratorConfig) -> TraceResult:

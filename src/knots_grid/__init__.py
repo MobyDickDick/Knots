@@ -9,10 +9,12 @@ from .generator import (
     make_candidate,
     search_candidate,
     search_candidates,
+    search_best_candidate,
     trefoil_candidate,
     torus_knot_candidate,
 )
 from .png import render_png
+from .projection import ProjectionMetrics, ProjectionScore, ProjectionWeights, score_projection
 from .reidemeister import Crossing, ReidemeisterReport, find_crossings, reidemeister_conditions
 from .svg import render_svg
 from .validator import ValidationResult, validate_cycle
@@ -22,6 +24,9 @@ __all__ = [
     "Crossing",
     "GeneratorConfig",
     "Point",
+    "ProjectionMetrics",
+    "ProjectionScore",
+    "ProjectionWeights",
     "ReidemeisterReport",
     "SearchConfig",
     "TraceResult",
@@ -32,6 +37,8 @@ __all__ = [
     "make_candidate",
     "search_candidate",
     "search_candidates",
+    "search_best_candidate",
+    "score_projection",
     "trefoil_candidate",
     "torus_knot_candidate",
     "reidemeister_conditions",

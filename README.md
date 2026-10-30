@@ -248,6 +248,42 @@ candidate = search_candidate(seed=2026, config=config)
 batch = search_candidates(10, seed=2026, config=config)
 ```
 
+## Projektionen bewerten und gezielt auswählen
+
+`score_projection(points)` bewertet einen validierten geschlossenen Gitterpfad.
+Die Rückgabe enthält den Gesamtwert (`total`, größer ist besser) und die
+einzelnen Kennzahlen (`metrics`). Die Bewertung verwendet die flache
+`(x,y)`-Projektion vor der diagonalen Verschiebung des Renderers.
+
+| Kennzahl | Definition | Standardgewicht |
+|---|---|---|
+| `crossings` | echte transversale Über-/Unterkreuzungen | +2,0 |
+| `length` | Kantenanzahl einschließlich Schlusskante | −0,05 |
+| `symmetry` | mittlerer erhaltener Punktanteil bei horizontaler/vertikaler Spiegelung und Halbdrehung um die Mitte des Begrenzungsrechtecks | +1,0 |
+| `area_utilization` | belegte Projektionspunkte / Gitterpunkte im Begrenzungsrechteck | +1,0 |
+| `layer_switches` | Anzahl Ebenenwechsel | −0,1 |
+| `degeneracies` | überlappende Projektionskanten plus nicht transversale Doppelbesuche ohne Ebenenwechsel | −1,0 |
+
+Symmetrie und Flächenausnutzung liegen zwischen 0 und 1. Die Gewichte sind
+endliche, nichtnegative Zahlen; die Vorzeichen der Belohnungen und Abzüge sind
+fest. Translationen, zyklischer Start, Umkehrung und die acht Gittersymmetrien
+ändern die Kennzahlen nicht.
+
+```python
+from knots_grid import ProjectionWeights, score_projection, search_best_candidate
+
+weights = ProjectionWeights(length=0.1, degeneracies=2.0)
+candidate = search_best_candidate(50, seed=2026, weights=weights)
+score = score_projection(candidate.points, weights=weights)
+print(score.total, score.metrics)
+```
+
+Die Bestenauswahl bewertet denselben Batch wie `search_candidates(50, seed=2026)`;
+bei Gleichstand gewinnt der erste Kandidat. Die bisherige Einzel- und
+Batchsuche bleibt verfügbar. Die Bewertung ist eine anpassbare ästhetische
+Heuristik, keine Knoteninvariante und kein Minimalitätsbeweis. Insbesondere
+macht die Bestenauswahl aus den lokalen Rechteckumwegen keine echten Knoten.
+
 ## Einen wirklichen Knoten erzeugen
 
 Lokale rechteckige Umwege und Kanten-Lifts ändern den Knotentyp nicht; aus
