@@ -44,6 +44,9 @@ def optimize(knot: Knot, *, max_rounds: int = 10_000) -> OptimizationResult:
     steps: list[OptimizationStep] = []
 
     for _ in range(max_rounds):
+        # Four vertices are the smallest simple cycle in this lattice.
+        if len(current) == 4:
+            break
         move = _find_layer_lift(current) or _find_rectangular_detour(current)
         if move is None:
             break

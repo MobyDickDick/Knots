@@ -169,9 +169,10 @@ def generate_catalog(
 
 
 def write_catalog(entries: Iterable[CatalogEntry], directory: str | Path) -> Path:
-    """Write one SVG per entry plus a machine-readable JSON manifest."""
+    """Write SVG/PNG files, a JSON manifest and an offline 2-D/3-D gallery."""
 
     target = Path(directory)
+    entries = tuple(entries)
     target.mkdir(parents=True, exist_ok=True)
     records: list[dict[str, object]] = []
     for entry in entries:
@@ -201,6 +202,10 @@ def write_catalog(entries: Iterable[CatalogEntry], directory: str | Path) -> Pat
         )
     manifest = target / "catalog.json"
     manifest.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
+    if entries:
+        from .gallery import render_gallery
+
+        render_gallery(entries, target / "index.html")
     return manifest
 
 

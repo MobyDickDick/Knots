@@ -4,6 +4,13 @@ from knots import Knot, check_knot, generate, optimize, rectangle, to_svg, trave
 
 
 class KnotTests(unittest.TestCase):
+    def test_optimizer_preserves_the_minimal_square(self):
+        knot = rectangle(2, 2)
+        result = optimize(knot)
+        self.assertEqual(result.knot, knot)
+        self.assertEqual(result.steps, ())
+        self.assertTrue(check_knot(result.knot).valid)
+
     def test_rectangle_is_valid(self):
         knot = rectangle(4, 3)
         report = check_knot(knot)

@@ -92,6 +92,13 @@ Farben:
 - Gitter $z=0$: dunkelgrau,
 - verschobenes Gitter $z=1$: hellgrau.
 
+Interaktive Katalogansicht (`src/knots_grid/gallery.py`, `gallery.html.template`):
+
+- [x] anklickbare Liste mit Vorschau der vorhandenen Katalogknoten,
+- [x] verschobene 2-D-Projektion in derselben Darstellung wie SVG,
+- [x] drehbare 3-D-Ansicht mit zwei Ebenen, Zoom und Gitter,
+- [x] eigenständiger Offline-Export sowie Galerie beim Katalogexport.
+
 ## Modul 4: Generator
 
 Dateien:
@@ -135,6 +142,71 @@ Ziel:
 - [x] notwendige Gauss-Wort-Bedingungen für Reidemeister I--III erkennen,
 - [ ] geometrisch leere Zugregionen prüfen und Züge tatsächlich ausführen,
 - [ ] einfache Knoteninvarianten ergänzen.
+
+## Arbeitspaket AP-01: Generator-Pipeline bis zur Galerie
+
+Status: **offen – nächstes Arbeitspaket**.
+
+Ziel: Den vorhandenen experimentellen Generator mit Knotenprüfung, kontrollierter
+Duplikaterkennung, Optimierung und Galerieexport verbinden. Die Sammlung soll
+auch Kandidaten außerhalb der bisher verwendeten Familie `T(2,q)` aufnehmen
+können. Alle Darstellungen bleiben zyklische Gitterpfade in
+`Z^2 x {0,1}`.
+
+```text
+Kandidaten generieren
+  → validieren
+  → Knotentyp bestimmen, soweit belegt
+  → Duplikate prüfen
+  → äquivalent optimieren
+  → Sammlung speichern und Galerie erzeugen
+```
+
+Teilaufgaben in Umsetzungsreihenfolge:
+
+- [ ] `travel_candidates(...)` als alternative Quelle an den Katalog anbinden;
+  Seed, Generatorparameter und Versuchslimit konfigurierbar machen.
+- [ ] Klassifikation aus Kreuzungsdaten und geeigneten Knoteninvarianten
+  ergänzen. Bekannte Referenzknoten zur Prüfung verwenden, darunter auch
+  Knotentypen außerhalb der Torusknotenfamilie. Nicht sicher zugeordnete
+  Kandidaten ausdrücklich als `unknown` speichern.
+- [ ] Exakte Darstellungsduplikate und nachgewiesene Knotenäquivalenz getrennt
+  behandeln. Gleiche Invarianten allein dürfen keine Äquivalenz begründen;
+  ungeklärte Kandidaten bleiben erhalten. Den Umgang mit Spiegelbildern und
+  Orientierung explizit festlegen.
+- [ ] Geometrisch abgesicherte, knotentyp-erhaltende Umformungen aus Modul 5
+  für die Optimierung implementieren und jede Änderung protokollieren.
+  Primär die Zahl der Gitterpunkte minimieren; bei gleicher Länge weiterhin
+  die bestehende Cantor-Reihenfolge verwenden. Ästhetische Bewertung separat
+  anzeigen und keine globale Minimalität behaupten.
+- [ ] Original und beste gefundene Darstellung mit Klassifikationsstatus,
+  Herkunft, Punktzahl vorher/nachher und angewandten Umformungen speichern.
+- [ ] Einen durchgängigen CLI-Aufruf für Generierung bis Galerieexport anbieten.
+  Die Galerie um neu erzeugte Kandidaten und einen Original/Optimiert-Vergleich
+  in 2-D und drehbarem 3-D erweitern.
+
+Abnahmekriterien:
+
+- [ ] Derselbe Seed mit denselben Parametern und Grenzen erzeugt dieselbe
+  Sammlung. Die Suche endet auch dann nach dem Versuchslimit mit einem klaren
+  Ergebnisbericht, wenn die gewünschte Zahl unterscheidbarer Knoten nicht
+  erreicht wird.
+- [ ] Jeder gespeicherte Ausgangs- und Ergebnispfad besteht die Validierung;
+  Ebenen außerhalb von `z=0` und `z=1` sind ausgeschlossen.
+- [ ] Tests decken bekannte Knotentypen, äquivalente Darstellungen,
+  nicht äquivalente Beispiele und ungeklärte Klassifikationen ab. Ein
+  Knotennamen- oder Eindeutigkeitsversprechen benötigt nachvollziehbare Evidenz.
+- [ ] Optimierte Ergebnisse sind nicht länger als ihre Ausgangspfade. Die
+  Äquivalenz ergibt sich aus den abgesicherten Umformungen, nicht allein aus
+  unveränderten Invarianten oder einem besseren ästhetischen Score.
+- [ ] Ein vollständiger Beispieldurchlauf liefert eine gespeicherte Sammlung
+  und eine offline nutzbare Galerie mit auswählbaren Originalen und Ergebnissen.
+
+Betroffene Bereiche: `generator.py`, `reidemeister.py`, `catalog.py`,
+`gallery.py`, `gallery.html.template` sowie zusätzliche Klassifikations- und
+Optimierungsmodule nach Bedarf. Die offenen Prüf- und Umformungsaufgaben aus
+Modul 5 sind Bestandteil dieses Arbeitspakets. Der Bild-Abzeichner bleibt ein
+späteres, separates Vorhaben.
 
 ## Modul 6: Bild-Abzeichner
 

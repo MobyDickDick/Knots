@@ -343,6 +343,52 @@ Reidemeister- beziehungsweise Knotenäquivalenz ist damit ausdrücklich noch
 nicht geleistet. Die Funktion zur Repräsentantenwahl setzt deshalb voraus,
 dass die Äquivalenz der übergebenen Knoten zuvor bewiesen wurde.
 
+## Knotengalerie mit drehbarer 3-D-Ansicht
+
+Eine anklickbare Liste des vorhandenen Katalogs lässt sich als einzelne,
+offline nutzbare HTML-Datei erzeugen:
+
+```bash
+python -m knots_grid.gallery --count 8 --output examples/knot_gallery.html
+```
+
+Die fertige Beispieldatei ist `examples/knot_gallery.html`. Die interne Vorlage
+heißt `src/knots_grid/gallery.html.template` und wird erst beim Export mit Daten
+gefüllt. Die frühere Vorlagenadresse `src/knots_grid/gallery.html` leitet zur
+fertigen Beispieldatei weiter.
+
+Die Datei im Browser öffnen und einen Knoten auswählen. Die Ansicht bietet:
+
+- **2-D · Dein Format:** dieselbe Projektion wie im SVG, mit der oberen
+  Schicht um `sqrt(2)/2` in beide Koordinatenrichtungen verschoben.
+- **3-D · Drehbar:** die tatsächlichen Gitterkoordinaten `(x, y, z)` auf genau
+  zwei Ebenen; Ziehen mit Maus oder Finger dreht, das Mausrad zoomt.
+- Pfeiltasten zum Drehen nach Fokus auf die Zeichenfläche, `+`/`-` zum Zoomen,
+  ein ausblendbares Gitter und ein einstellbarer visueller Schichtabstand.
+
+Blau bezeichnet Ebene 0, Grün Ebene 1 und Rot die Ebenenwechsel. Der
+Schichtabstand ändert nur die Ansicht; die gespeicherten Punkte bleiben auf
+`z=0` und `z=1`. Die räumliche Darstellung verschiebt die obere Ebene nicht
+seitlich. Kanten werden nach Kameratiefe gezeichnet.
+
+Auch der bisherige Katalogexport erstellt nun eine `index.html` neben den
+SVG-, PNG- und JSON-Dateien. Für eigene Listen kann
+`knots_grid.gallery.render_gallery(entries, filename)` mit `CatalogEntry`-Objekten
+verwendet werden. Die Galerie benötigt weder einen Server noch externe
+Bibliotheken. Liste und SVG-Vorschauen stehen bereits im HTML und können auch
+ohne JavaScript über die Vorschaulinks betrachtet werden. Für die drehbare
+Ansicht muss JavaScript aktiviert sein. Falls ihr Start fehlschlägt, bleiben
+die 2-D-Ansichten sichtbar und die Fehlermeldung erscheint oberhalb der Galerie.
+Das enthaltene Beispiel zeigt den Unknoten und die vorhandene
+Torusknotenfamilie, nicht eine vollständige klassische Knotentabelle wie auf
+dem Referenzfoto.
+
+Die Galerie-Bedienlogik kann zusätzlich ohne Browser geprüft werden:
+
+```bash
+node tests/test_gallery_runtime.cjs
+```
+
 ## Alternative Generationsstrategie: Reisen durch eindeutige Punkte
 
 Neben Rechtecken und lokaler Suche gibt es nun eine bounded Strategie, die nicht
