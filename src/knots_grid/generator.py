@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from random import Random
 
 from .core import Direction, Point, TraceResult, trace_turtle
-from .projection import ProjectionWeights, score_projection
 from .validator import validate_cycle
 
 
@@ -60,6 +59,27 @@ class SearchConfig:
             raise ValueError("max_search_steps must not be smaller than min_search_steps")
         if not 0.0 <= self.layer_probability <= 1.0:
             raise ValueError("layer_probability must be between 0 and 1")
+
+
+@dataclass(frozen=True, slots=True)
+class TravelConfig:
+    """Settings for permutation-based grid-diagram generation.
+
+    The generator chooses ``point_count`` X/O marker pairs on a square grid.
+    Each marker row and each marker column is used exactly once, which is the
+    grid-diagram analogue of assigning every prescribed waypoint its own x- and
+    y-coordinate.  Random permutations are tried up to ``max_attempts`` times
+    until their horizontal-then-vertical travel describes one closed component.
+    """
+
+    point_count: int = 10
+    max_attempts: int = 500
+
+    def __post_init__(self) -> None:
+        if self.point_count < 2:
+            raise ValueError("point_count must be at least 2")
+        if self.max_attempts < 1:
+            raise ValueError("max_attempts must be at least 1")
 
 
 def trefoil_candidate() -> TraceResult:
@@ -210,27 +230,38 @@ def search_candidates(
     return tuple(_search_candidate(random, config) for _ in range(count))
 
 
-def search_best_candidate(
-    sample_count: int = 20,
+def travel_candidate(
     *,
     seed: int | None = None,
-    config: SearchConfig = SearchConfig(),
-    weights: ProjectionWeights = ProjectionWeights(),
+    config: TravelConfig = TravelConfig(),
 ) -> TraceResult:
-    """Return the highest-scoring drawing from a reproducible search batch.
+    """Generate a closed candidate by trying random travels through markers.
 
-    Ties prefer the first generated candidate. The batch uses exactly the same
-    random stream as ``search_candidates(sample_count, seed=seed, config=config)``.
-    Aesthetic selection does not establish knot type or minimality.
+    This strategy avoids the previous open-ended local modification loop.  It
+    first creates two random permutations of ``point_count`` grid columns: one
+    permutation for X markers and one for O markers.  Because both permutations
+    use every row/column once, no two marker waypoints share an x- or
+    y-coordinate.  The resulting grid diagram routes horizontally on layer 0
+    and vertically on layer 1, so projected crossings get deterministic
+    over/under information instead of invalid same-layer intersections.
     """
 
-    if sample_count < 1:
-        raise ValueError("sample_count must be at least 1")
-    candidates = search_candidates(sample_count, seed=seed, config=config)
-    return max(
-        candidates,
-        key=lambda candidate: score_projection(candidate.points, weights=weights).total,
-    )
+    return _travel_candidate(Random(seed), config)
+
+
+def travel_candidates(
+    count: int,
+    *,
+    seed: int | None = None,
+    config: TravelConfig = TravelConfig(),
+) -> tuple[TraceResult, ...]:
+    """Generate ``count`` permutation-travel candidates from one random stream."""
+
+    if count < 0:
+        raise ValueError("count must be non-negative")
+
+    random = Random(seed)
+    return tuple(_travel_candidate(random, config) for _ in range(count))
 
 
 def _generate_candidate(random: Random, config: GeneratorConfig) -> TraceResult:
@@ -253,6 +284,29 @@ def _generate_candidate(random: Random, config: GeneratorConfig) -> TraceResult:
             parts.append(side_code)
 
     return make_candidate("".join(parts))
+
+
+def _travel_candidate(random: Random, config: TravelConfig) -> TraceResult:
+    columns = list(range(config.point_count))
+
+    for _ in range(config.max_attempts):
+        x_columns = columns.copy()
+        o_columns = columns.copy()
+        random.shuffle(x_columns)
+        random.shuffle(o_columns)
+
+        if any(x_column == o_column for x_column, o_column in zip(x_columns, o_columns)):
+            continue
+
+        try:
+            return _grid_diagram_candidate(tuple(x_columns), tuple(o_columns))
+        except ValueError:
+            continue
+
+    raise RuntimeError(
+        "could not find a one-component crossing-safe travel diagram "
+        f"after {config.max_attempts} attempts"
+    )
 
 
 def _search_candidate(random: Random, config: SearchConfig) -> TraceResult:

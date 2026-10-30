@@ -1,6 +1,6 @@
 import unittest
 
-from knots import Knot, check_knot, generate, optimize, rectangle, to_svg
+from knots import Knot, check_knot, generate, optimize, rectangle, to_svg, travel
 
 
 class KnotTests(unittest.TestCase):
@@ -20,6 +20,14 @@ class KnotTests(unittest.TestCase):
         report = check_knot(knot)
         self.assertTrue(report.valid, report.errors)
         self.assertGreater(len(knot), len(rectangle()))
+
+    def test_travel_generator_outputs_valid_bounded_knot(self):
+        knot = travel(seed=2026, point_count=10)
+        report = check_knot(knot)
+        self.assertTrue(report.valid, report.errors)
+        self.assertEqual(knot.points[0], (0, 0, 0))
+        self.assertGreater(len(knot), len(rectangle()))
+        self.assertEqual(generate("travel", seed=2026), knot)
 
     def test_optimizer_removes_generated_detours(self):
         knot = generate("layered", seed=5)
