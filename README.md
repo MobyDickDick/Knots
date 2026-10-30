@@ -59,7 +59,8 @@ Der Startpunkt wird am Ende nicht wiederholt; die Schlusskante ist implizit.
 
 ```bash
 python -m unittest discover -s tests
-=======
+```
+
 # Knots
 
 Dieses Repository ist ein experimentelles Projekt für **Knoten und Gitterdiagramme**.
