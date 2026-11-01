@@ -20,6 +20,10 @@ from .generator import (
 from .png import render_png
 from .projection import ProjectionMetrics, ProjectionScore, ProjectionWeights, score_projection
 from .reidemeister import Crossing, ReidemeisterReport, find_crossings, reidemeister_conditions
+from .reidemeister_moves import (
+    MoveRejection, ReidemeisterAnalysis, ReidemeisterMove, ReidemeisterRegion,
+    analyze_reidemeister_moves, apply_reidemeister_move,
+)
 from .svg import render_svg
 from .validator import ValidationResult, validate_cycle
 
@@ -32,6 +36,12 @@ __all__ = [
     "ProjectionScore",
     "ProjectionWeights",
     "ReidemeisterReport",
+    "ReidemeisterRegion",
+    "ReidemeisterMove",
+    "ReidemeisterAnalysis",
+    "MoveRejection",
+    "analyze_reidemeister_moves",
+    "apply_reidemeister_move",
     "SearchConfig",
     "TraceResult",
     "TravelConfig",

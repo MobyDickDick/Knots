@@ -1,18 +1,23 @@
-"""Replayable ambient isotopies across empty unit lattice faces.
+"""Replayable ambient isotopies across empty faces and Reidemeister regions.
 
 Replace three sides of a face by the fourth (3 -> 1), or two sides by
 the other two (2 -> 2). Unit lattice edges cannot pierce the interior of
 a unit lattice face. Checking the unused boundary vertices therefore certifies
 that the swept disk is disjoint from the rest of the knot. This is a spatial
-isotopy certificate even if the flat projection is degenerate. No move leaves
+isotopy certificate even if the flat projection is degenerate. No result leaves
 the two-layer lattice. This deliberately bounded engine is not a general
-Reidemeister solver and does not claim global minimality.
+Reidemeister solver and does not claim global minimality. Direct moves are
+provided by reidemeister_moves; the same strict objective applies to both.
 """
 
 from dataclasses import dataclass
 
 from .catalog import canonicalize_cycle, sequence_measure
 from .core import Point
+from .reidemeister_moves import (
+    MoveRejection, ReidemeisterMove, analyze_reidemeister_moves,
+    apply_reidemeister_move,
+)
 from .validator import validate_cycle
 
 
@@ -27,8 +32,9 @@ class FaceMove:
 @dataclass(frozen=True, slots=True)
 class OptimizationResult:
     points: tuple[Point, ...]
-    moves: tuple[FaceMove, ...]
+    moves: tuple[FaceMove | ReidemeisterMove, ...]
     status: str
+    reidemeister_rejections: tuple[MoveRejection, ...] = ()
 
 
 def _face_boundary(before, after):
@@ -64,6 +70,21 @@ def apply_face_move(points, move: FaceMove) -> tuple[Point, ...]:
     return result
 
 
+def apply_move(points, move: FaceMove | ReidemeisterMove) -> tuple[Point, ...]:
+    """Replay a logged face or direct Reidemeister move, rechecking geometry."""
+    if move.kind == "empty_unit_face":
+        return apply_face_move(points, move)
+    return apply_reidemeister_move(points, move)
+
+
+def move_from_dict(record: dict) -> FaceMove | ReidemeisterMove:
+    """Read either log kind from the JSON representation used by the catalog."""
+    kind = record["kind"]
+    cls = FaceMove if kind == "empty_unit_face" else ReidemeisterMove
+    return cls(record["start_index"], tuple(Point(**p) for p in record["before"]),
+               tuple(Point(**p) for p in record["after"]), kind)
+
+
 def _moves(points):
     body = points[:-1]
     n = len(body)
@@ -89,7 +110,7 @@ def _moves(points):
                 yield move, result
 
 
-def optimize_cycle(points, *, max_moves: int = 100) -> OptimizationResult:
+def optimize_cycle(points, *, max_moves: int = 100, max_route_states: int = 5000) -> OptimizationResult:
     """Strictly improve (point count, canonical Cantor order) within a budget.
 
     Canonical comparison uses rotations only, so no reflection can silently
@@ -98,6 +119,8 @@ def optimize_cycle(points, *, max_moves: int = 100) -> OptimizationResult:
     """
     if max_moves < 0:
         raise ValueError("max_moves must be non-negative")
+    if type(max_route_states) is not int or max_route_states < 1:
+        raise ValueError("max_route_states must be a positive integer")
     current = tuple(points)
     validate_cycle(current).raise_for_errors()
     log = []
@@ -105,14 +128,18 @@ def optimize_cycle(points, *, max_moves: int = 100) -> OptimizationResult:
         measure = sequence_measure(canonicalize_cycle(current, include_reflections=False)[:-1])
         best = None
         best_measure = measure
-        for move, candidate in _moves(current):
+        analysis = analyze_reidemeister_moves(current, max_route_states=max_route_states)
+        candidates = [(move, apply_reidemeister_move(current, move)) for move in analysis.moves]
+        for move, candidate in (*candidates, *_moves(current)):
             candidate_measure = sequence_measure(
                 canonicalize_cycle(candidate, include_reflections=False)[:-1])
             if candidate_measure < best_measure:
                 best = move, candidate
                 best_measure = candidate_measure
         if best is None:
-            return OptimizationResult(current, tuple(log), "local_minimum")
+            return OptimizationResult(current, tuple(log), "local_minimum", analysis.rejections)
         move, current = best
         log.append(move)
-    return OptimizationResult(current, tuple(log), "move_limit")
+    rejections = (analyze_reidemeister_moves(current, max_route_states=max_route_states).rejections
+                  if log else ())
+    return OptimizationResult(current, tuple(log), "move_limit", rejections)

@@ -140,23 +140,26 @@ Ziel:
 
 - [x] flache Kreuzungen samt Über-/Unterinformation aus $z$ bestimmen,
 - [x] notwendige Gauss-Wort-Bedingungen für Reidemeister I--III erkennen,
-- [ ] geometrisch leere Reidemeister-Zugregionen prüfen und die direkten
-  Reidemeister-I--III-Züge tatsächlich ausführen,
+- [x] geometrisch leere Reidemeister-Zugregionen prüfen und direkte
+  Reidemeister-I--III-Züge mit begrenzten Gitterrealisierungen ausführen
+  (`reidemeister_moves.py`, Ablehnungsgründe und Replay),
 - [x] als konservative Grundlage geometrisch leere lokale Gitterflächen prüfen
   und knotentyp-erhaltende Flächenzüge ausführen (`optimization.py`, mit Replay-Protokoll),
 - [x] die Knotendeterminante aus der Fox-Färbungsmatrix exakt berechnen
   (`classification.py`).
 
-Weiterer Ausbau: direkte, allgemeine Reidemeister-I--III-Züge anhand der
-Gauss-Kandidaten. Der aktuelle geometrische Zugmotor verwendet freie
-Einheitsquadrate im Raum (3→1 und 2→2). Er führt keine ungeprüften
-Gauss-Kandidaten aus und ist kein vollständiger Reidemeister-Entscheider.
+Der geometrische Zugmotor kombiniert freie Einheitsquadrate im Raum (3→1 und
+2→2) mit direkten Schleifen-/Zweieckreduktionen und Dreiecksverschiebungen.
+Er führt keine ungeprüften Gauss-Kandidaten aus. Die begrenzte Routensuche und
+die Anforderung eines ebenen bewegten Extremstrangs bei II/III machen ihn
+weiterhin zu keinem vollständigen Reidemeister-Entscheider.
 
 ## Arbeitspaket AP-01: Generator-Pipeline bis zur Galerie
 
-Status: **weitgehend umgesetzt am 30.10.2026 – direkte Reidemeister-I--III-Züge
-noch offen**. Die durchgängige Pipeline mit konservativer Referenzklassifikation
-und begrenzter Optimierung über freie Gitterflächen ist verfügbar.
+Status: **umgesetzt am 01.11.2026**. Die durchgängige Pipeline mit konservativer
+Referenzklassifikation, freien Gitterflächen und direkten geometrisch geprüften
+Reidemeister-I--III-Zügen ist verfügbar. Die Gitterrealisierungen bleiben bewusst
+begrenzt; nicht unterstützte Fälle werden begründet zurückgegeben.
 
 Ziel: Den vorhandenen experimentellen Generator mit Knotenprüfung, kontrollierter
 Duplikaterkennung, Optimierung und Galerieexport verbinden. Die Sammlung soll
@@ -185,13 +188,14 @@ Teilaufgaben in Umsetzungsreihenfolge:
   behandeln. Gleiche Invarianten allein dürfen keine Äquivalenz begründen;
   ungeklärte Kandidaten bleiben erhalten. Den Umgang mit Spiegelbildern und
   Orientierung explizit festlegen.
-- [ ] Geometrisch abgesicherte, knotentyp-erhaltende Umformungen aus Modul 5
+- [x] Geometrisch abgesicherte, knotentyp-erhaltende Umformungen aus Modul 5
   für die Optimierung implementieren und jede Änderung protokollieren.
   Primär die Zahl der Gitterpunkte minimieren; bei gleicher Länge weiterhin
   die bestehende Cantor-Reihenfolge verwenden. Ästhetische Bewertung separat
   anzeigen und keine globale Minimalität behaupten. Als Grundlage sind freie
   Gitterflächen-Züge mit Punktzahl-/Cantor-Optimierung und vollständigem Protokoll
-  umgesetzt; die direkten Reidemeister-Züge sind noch zu ergänzen.
+  umgesetzt; direkte Reidemeister-I--III-Züge sind mit geprüften Regionen,
+  begrenzter Routensuche und erneut geometrisch geprüftem Replay ergänzt.
 - [x] Original und beste gefundene Darstellung mit Klassifikationsstatus,
   Herkunft, Punktzahl vorher/nachher und angewandten Umformungen speichern.
 - [x] Einen durchgängigen CLI-Aufruf für Generierung bis Galerieexport anbieten.
@@ -217,7 +221,7 @@ Abnahmekriterien:
 
 Betroffene Bereiche: `generator.py`, `reidemeister.py`, `catalog.py`,
 `gallery.py`, `gallery.html.template` sowie zusätzliche Klassifikations- und
-Optimierungsmodule nach Bedarf. Die offenen Prüf- und Umformungsaufgaben aus
+Optimierungsmodule nach Bedarf. Die Prüf- und Umformungsaufgaben aus
 Modul 5 sind Bestandteil dieses Arbeitspakets. Der Bild-Abzeichner bleibt ein
 späteres, separates Vorhaben.
 
@@ -237,28 +241,52 @@ Umsetzung und Grenzen:
   Toruskatalogs bleibt als Standard der alten API erhalten.
 - Die Optimierung prüft freie Einheitsquadrate in den Ebenen xy, xz und yz.
   Jedes akzeptierte Ergebnis verbessert streng `(Punktzahl, Cantor-Folge)`;
-  alle Änderungen lassen sich mit `apply_face_move` wiederholen. Das
-  Bewegungsbudget begrenzt die Suche. Auch innerhalb belegter Äquivalenzklassen
+  direkte Reidemeister-Züge unterliegen derselben Priorität. Alle Änderungen
+  lassen sich mit `optimization.apply_move` wiederholen, JSON-Protokolle mit
+  `move_from_dict` einlesen. Das Bewegungsbudget und `--route-states` begrenzen
+  die Suche. Auch innerhalb belegter Äquivalenzklassen
   wird der kürzere beziehungsweise bei Gleichstand kleinere Repräsentant behalten.
 - `examples/travel_catalog/index.html` ist der vollständige Offline-Beispiellauf.
   Original und Ergebnis sind in beiden Ansichten umschaltbar. Die Python-Tests
   prüfen Validierung, Referenzen, Spiegel, ungeklärte Fälle, Grenzen, Zug-Replay
   und bytegleiche Exporte. Der Node-Laufzeittest prüft zusätzlich die
-  Original-/Ergebnisumschaltung. Eine manuelle visuelle Browserabnahme war in
-  dieser Sitzung durch die Computer-Use-Browserrichtlinie nicht möglich.
+  Original-/Ergebnisumschaltung. Die Tests der direkten Züge prüfen alle drei
+  Typen, leere und belegte Regionen, zyklische Über-/Untermuster, Transformationen,
+  manipulierte Protokolle und begrenzte Suchen.
 
-## Verbleibende Aufgabe in AP-01: direkte Reidemeister-Züge
+## Abschluss von AP-01: direkte Reidemeister-Züge
 
-- [ ] Für die Gauss-Kandidaten aus `reidemeister_conditions` die zugehörigen
+- [x] Für die Gauss-Kandidaten aus `reidemeister_conditions` die zugehörigen
   ebenen Ein-, Zwei- und Dreiecksregionen explizit rekonstruieren.
-- [ ] Deren Leerheit einschließlich der übrigen Stränge geometrisch prüfen
+- [x] Deren Leerheit einschließlich der übrigen Stränge geometrisch prüfen
   und direkte Gitterrealisierungen für Reidemeister I--III ergänzen.
-- [ ] Nicht ausführbare oder degenerierte Fälle begründet zurückgeben;
+- [x] Nicht ausführbare oder degenerierte Fälle begründet zurückgeben;
   jede tatsächlich ausgeführte Änderung weiter mit einem Replay-Protokoll belegen.
 
-Diese Erweiterung soll über den begrenzten Flächenzugmotor hinausgehen und
-Klassifikation sowie Optimierung verbessern, ohne globale Minimalität oder
-vollständige Knotenerkennung zu versprechen.
+`reidemeister_moves.py` rekonstruiert einfache begrenzte Flächen des exakten
+Projektionsgraphen und prüft Punkte sowie Kanten der übrigen Stränge. Typ I
+kontrahiert eine leere Schleife, Typ II entfernt zwei Kreuzungen und Typ III
+verschiebt einen oberen oder unteren Strang über die mittlere Kreuzung.
+Zyklische Über-/Untermuster werden ausdrücklich abgelehnt. Jeder ausgeführte
+Zug besitzt ein Protokoll aus Index, vorherigem und folgendem Teilpfad sowie Typ;
+das Replay rekonstruiert die Region erneut und prüft die lokale Geometrie.
+
+Grenzen: Bei II/III muss der bewegte Teilpfad einschließlich seiner direkten
+Nachbarn in einer Ebene liegen. Die Suche bleibt in einem Drei-Zellen-Rand um
+die Region und verwendet höchstens `--route-states` Zustände je bewegtem Strang.
+Keine inversen I/II-Züge, automatische Gitterverfeinerung oder längenvergrößernden
+Zwischenschritte in der Optimierung. Solche Fälle dürfen zurückgewiesen werden;
+sie begründen keine Aussage über Unveränderbarkeit oder globale Minimalität.
+Details und Isotopieargument: [Direkte Reidemeister-Züge](reidemeister_moves.md).
+
+Abnahme am 01.11.2026: 83 Python-Tests sowie beide Node-Galerieprüfungen
+erfolgreich. Der dokumentierte CLI-Beispiellauf mit Seed 2026 erzeugt 8 Einträge
+in 21 Versuchen (13 nachgewiesene Äquivalenzduplikate). Die gespeicherten
+Ergebnisprotokolle enthalten 9 direkte I-, 7 direkte II- und 528 Flächenzüge;
+Typ III wird zusätzlich anhand einer eigenen Dreiecks-Testdarstellung ausgeführt.
+Alle Katalog- und Duplikatprotokolle des Beispiels wurden geometrisch erneut
+ausgeführt. Der Galerieexport ist aktualisiert; eine manuelle visuelle
+Browserprüfung ist damit nicht behauptet.
 
 ## Modul 6: Bild-Abzeichner
 

@@ -21,7 +21,7 @@ POLICY = {
     "orientation": "ignored",
     "mirrors": "separate except reference-certified amphichiral knots",
     "exact_duplicates": "translation, cyclic start, reversal and planar rotations; no reflections",
-    "equivalence": "certified reference identity or identical result reached by logged face isotopies",
+    "equivalence": "certified reference identity or identical result reached by logged geometric isotopies",
     "unknown": "retained even when determinants agree; distinct knot types not guaranteed",
 }
 
@@ -58,7 +58,7 @@ class CollectionResult:
 def generate_collection(
     count: int = 8, *, seed: int | None = None, mode: str = "random",
     config: TravelConfig = TravelConfig(), max_attempts: int = 500,
-    max_moves: int = 100,
+    max_moves: int = 100, max_route_states: int = 5000,
 ) -> CollectionResult:
     """Try at most max_attempts seeds, each with its own bounded travel search.
 
@@ -67,12 +67,15 @@ def generate_collection(
     """
     if count < 0 or max_attempts < 0 or max_moves < 0:
         raise ValueError("count, max_attempts and max_moves must be non-negative")
+    if type(max_route_states) is not int or max_route_states < 1:
+        raise ValueError("max_route_states must be a positive integer")
     if mode not in {"random", "systematic"}:
         raise ValueError("mode must be 'random' or 'systematic'")
     provenance = {
-        "algorithm": "travel-face-v1", "seed": seed, "mode": mode,
+        "algorithm": "travel-reidemeister-v2", "seed": seed, "mode": mode,
         "generator": "travel", "generator_parameters": asdict(config),
         "max_attempts": max_attempts, "max_moves": max_moves,
+        "max_route_states": max_route_states,
     }
     seeds = _candidate_seeds(mode, seed)
     entries, events = [], []
@@ -96,7 +99,7 @@ def generate_collection(
                            "equivalent_to": seen_originals[original_key]})
             continue
         classification_before = classify_knot(original)
-        optimized = optimize_cycle(original, max_moves=max_moves)
+        optimized = optimize_cycle(original, max_moves=max_moves, max_route_states=max_route_states)
         validate_cycle(optimized.points).raise_for_errors()
         classification_after = classify_knot(optimized.points)
         classification = (classification_before if classification_before.status == "certified"
@@ -104,7 +107,7 @@ def generate_collection(
         if (classification_before.determinant is not None
                 and classification_after.determinant is not None
                 and classification_before.determinant != classification_after.determinant):
-            raise RuntimeError("determinant changed across certified face isotopies")
+            raise RuntimeError("determinant changed across certified geometric isotopies")
         if classification.determinant is None and classification_before.determinant is not None:
             classification = replace(
                 classification, determinant=classification_before.determinant,
@@ -140,12 +143,13 @@ def generate_collection(
             "classification": asdict(classification),
             "original_classification": asdict(classification_before),
             "result_classification": asdict(classification_after),
-            "classification_transfer": "original and result equivalent by replayable empty-face isotopies",
+            "classification_transfer": "original and result equivalent by replayable geometric isotopies",
             "provenance": {**provenance, "candidate_seed": candidate_seed, "attempt": attempts},
             "point_count_before": len(original) - 1,
             "point_count_after": len(optimized.points) - 1,
             "moves": [asdict(move) for move in optimized.moves],
             "optimization_status": optimized.status,
+            "reidemeister_rejections": [asdict(r) for r in optimized.reidemeister_rejections],
             "global_minimality_claimed": False,
             "aesthetic_before": asdict(score_projection(original)),
             "aesthetic_after": asdict(score_projection(optimized.points)),
@@ -171,5 +175,5 @@ def write_collection(result: CollectionResult, directory: str | Path) -> Path:
     """Write original/result artifacts, standalone gallery and search report."""
     manifest = write_catalog(result.entries, directory)
     (Path(directory) / "report.json").write_text(
-        json.dumps(result.report(), indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+        json.dumps(result.report(), indent=2, ensure_ascii=True) + "\n", encoding="utf-8", newline="\n")
     return manifest

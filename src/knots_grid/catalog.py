@@ -222,7 +222,7 @@ def write_catalog(entries: Iterable[CatalogEntry], directory: str | Path) -> Pat
                 "metadata": entry.metadata,
             })
     manifest = target / "catalog.json"
-    manifest.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
+    manifest.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8", newline="\n")
     if entries:
         from .gallery import render_gallery
 
@@ -271,6 +271,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-attempts", type=int)
     parser.add_argument("--travel-attempts", type=int, default=500)
     parser.add_argument("--max-moves", type=int, default=100)
+    parser.add_argument("--route-states", type=int, default=5000,
+                        help="bounded routing states per direct Reidemeister arc")
     parser.add_argument("--output", type=Path, default=Path("knot_catalog"))
     args = parser.parse_args(argv)
     if args.source == "travel":
@@ -281,7 +283,7 @@ def main(argv: list[str] | None = None) -> int:
             args.count, mode=args.mode, seed=args.seed,
             config=TravelConfig(args.point_count, args.travel_attempts),
             max_attempts=500 if args.max_attempts is None else args.max_attempts,
-            max_moves=args.max_moves,
+            max_moves=args.max_moves, max_route_states=args.route_states,
         )
         manifest = write_collection(result, args.output)
         print(f"{result.status}: {len(result.entries)}/{args.count} entries; "

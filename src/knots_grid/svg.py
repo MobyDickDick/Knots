@@ -112,4 +112,4 @@ def render_svg(
         lines.append(f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="3.2" fill="{fill}"/>')
 
     lines.append("</svg>")
-    Path(filename).write_text("\n".join(lines), encoding="utf-8")
+    Path(filename).write_text("\n".join(lines), encoding="utf-8", newline="\n")

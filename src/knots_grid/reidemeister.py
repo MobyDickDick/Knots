@@ -2,7 +2,7 @@
 
 The functions in this module deliberately report *candidates*.  Adjacency in
 the Gauss word is necessary for a Reidemeister move; checking that the bounded
-regions are empty is a separate geometric operation.
+regions are empty is a separate geometric operation in reidemeister_moves.
 """
 
 from __future__ import annotations
@@ -110,7 +110,7 @@ def reidemeister_conditions(
     for pair, status in neighbours.items():
         # Both boundary arcs must be present. On each, the same strand remains
         # over (or under) at the two crossings.
-        if len(status) >= 2 and all(a == b for a, b in status[:2]):
+        if (False, False) in status and (True, True) in status:
             type_ii.append(tuple(sorted(pair)))
 
     adjacency = {pair for pair, status in neighbours.items() if status}

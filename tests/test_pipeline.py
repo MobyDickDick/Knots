@@ -10,7 +10,7 @@ from knots_grid import Point, TravelConfig, figure_eight_candidate, trace_turtle
 from knots_grid.catalog import canonical_key
 from knots_grid.classification import classify_knot, knot_determinant, signed_gauss_key
 from knots_grid.generator import torus_knot_candidate, travel_candidate
-from knots_grid.optimization import FaceMove, apply_face_move, optimize_cycle
+from knots_grid.optimization import FaceMove, apply_face_move, apply_move, move_from_dict, optimize_cycle
 from knots_grid.pipeline import generate_collection, write_collection
 from knots_grid.validator import validate_cycle
 
@@ -72,7 +72,7 @@ class OptimizationTests(unittest.TestCase):
         points = original
         measure = lambda p: sequence_measure(canonicalize_cycle(p, include_reflections=False)[:-1])
         for move in result.moves:
-            after = apply_face_move(points, move)
+            after = apply_move(points, move)
             self.assertTrue(validate_cycle(after).is_valid)
             self.assertLess(measure(after), measure(points))
             self.assertLessEqual(len(after), len(points))
@@ -128,6 +128,8 @@ class CollectionTests(unittest.TestCase):
             self.assertLessEqual(len(entry.points), len(entry.original_points))
             self.assertEqual(entry.metadata["provenance"]["generator_parameters"],
                              {"point_count": 7, "max_attempts": 100})
+            self.assertEqual(entry.metadata["provenance"]["max_route_states"], 5000)
+            self.assertIsInstance(entry.metadata["reidemeister_rejections"], list)
             self.assertEqual(entry.determinant, entry.metadata["original_classification"]["determinant"])
 
     def test_exact_and_proven_equivalents_have_separate_counters(self):
@@ -187,9 +189,7 @@ class CollectionTests(unittest.TestCase):
                 points = tuple(Point(*p) for p in record["original_points"])
                 points += (points[0],)
                 for item in record["metadata"]["moves"]:
-                    move = FaceMove(item["start_index"], tuple(Point(**p) for p in item["before"]),
-                                    tuple(Point(**p) for p in item["after"]), item["kind"])
-                    points = apply_face_move(points, move)
+                    points = apply_move(points, move_from_dict(item))
                 self.assertEqual(points, entry.points)
                 self.assertEqual(record["points"], [[p.x, p.y, p.z] for p in points[:-1]])
             # End-to-end reproducibility includes every exported artifact.
@@ -197,6 +197,8 @@ class CollectionTests(unittest.TestCase):
             write_collection(result, second)
             for artifact in second.iterdir():
                 self.assertEqual(artifact.read_bytes(), (Path(directory) / artifact.name).read_bytes())
+                if artifact.suffix in (".json", ".svg", ".html"):
+                    self.assertNotIn(b"\r", artifact.read_bytes())
 
 
 if __name__ == "__main__":

@@ -463,7 +463,7 @@ Start, Umkehrung und Drehungen des Gitters entfernt. Spiegelungen gehören
 weiterhin zur alten D4-Kanonisierung, werden in der neuen Pipeline aber
 ausdrücklich ausgeschaltet.
 
-Die Optimierung bewegt den Pfad ausschließlich über nachweislich freie
+Die Flächenzüge der Optimierung bewegen den Pfad über nachweislich freie
 Einheitsquadrate im räumlichen Gitter. Drei Kanten können durch eine ersetzt
 werden; zwei durch die beiden anderen Quadratseiten. Weil Einheits-Gitterkanten
 das Innere eines solchen Quadrats nicht durchstoßen können und die neue
@@ -474,10 +474,26 @@ Cantor-Folge; die ästhetische Bewertung entscheidet nicht über Vereinfachung
 oder Äquivalenz. Eine bereits aus der Originalprojektion bekannte Determinante
 bleibt auch bei einer degenerierten Ergebnisprojektion erhalten.
 
-Dies ist eine begrenzte lokale Optimierung. Allgemeine direkte
-Reidemeister-I--III-Züge und eine globale Minimalitätsentscheidung sind damit
-weiterhin nicht implementiert; die Gauss-Wort-Kandidaten werden nicht ungeprüft
-ausgeführt. Der nächste Ausbau ist in `docs/project_plan.md` dokumentiert.
+Zusätzlich rekonstruiert `analyze_reidemeister_moves(points)` einfache, leere
+Ein-, Zwei- und Dreiecksregionen aus den Gauss-Kandidaten. Direkte Typ-I- und
+Typ-II-Reduktionen sowie Typ-III-Verschiebungen werden geometrisch geprüft und
+mit denselben Protokollfeldern gespeichert. Ein zyklisches Über-/Untermuster im
+Dreieck ist ausdrücklich kein ausführbarer Typ-III-Zug.
+
+Bei II/III muss der bewegte obere oder untere Teilpfad in einer Ebene liegen.
+Die begrenzte Gitterroutensuche verwendet einen Drei-Zellen-Rand und höchstens
+`--route-states 5000` Zustände pro Bogen. Nicht unterstützte Fälle liefern
+konkrete Ablehnungsgründe. Die Optimierung nimmt auch bei direkten Zügen nur
+Verbesserungen nach Punktzahl und Cantor-Folge an; längere Zwischenschritte
+werden nicht untersucht. Dies bleibt eine lokale Suche ohne globale
+Minimalitätsentscheidung oder vollständige Knotenerkennung.
+
+Gemischte gespeicherte Protokolle lassen sich mit
+`knots_grid.optimization.move_from_dict` einlesen und mit `apply_move` erneut
+geometrisch prüfen und ausführen. `apply_face_move` bleibt für alte reine
+Flächenprotokolle verfügbar. Details und Isotopieargument stehen in
+[docs/reidemeister_moves.md](docs/reidemeister_moves.md), der aktualisierte
+Projektstatus in [docs/project_plan.md](docs/project_plan.md).
 
 Zusätzliche Laufzeitprüfung für die Vergleichsansicht:
 
