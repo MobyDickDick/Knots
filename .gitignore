@@ -13,3 +13,5 @@ build/
 .test_tmp/
 !examples/travel_catalog/*.json
 !examples/travel_catalog/*.svg
+!examples/image_trace/*.json
+!examples/image_trace/*.svg

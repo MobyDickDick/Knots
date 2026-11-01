@@ -207,12 +207,17 @@ button:focus-visible,input:focus-visible,canvas:focus-visible { outline:3px soli
     const values=[['Kreuzungen',active.crossings],['Gitterkanten',active.points.length-1],['Determinante',knot.determinant ?? 'ungeklärt']];
     if(knot.metadata) {
       const m=knot.metadata;
-      values.push(['Punkte vorher → nachher',m.point_count_before+' → '+m.point_count_after],
-        ['abgesicherte Umformungen',m.moves.length],['Seed',m.provenance.candidate_seed],
-        ['ästhetischer Wert',Number(version==='original'?m.aesthetic_before.total:m.aesthetic_after.total).toFixed(2)]);
+      if(m.source==='manual_image_annotation') {
+        values.push(['Quelle','Bild-Abzeichner'],['Vorlage',m.annotation.source_image??'ohne Bilddatei'],['Stützpunkte',m.annotation.waypoints.length]);
+      } else {
+        values.push(['Punkte vorher → nachher',m.point_count_before+' → '+m.point_count_after],
+          ['abgesicherte Umformungen',m.moves.length],['Seed',m.provenance.candidate_seed],
+          ['ästhetischer Wert',Number(version==='original'?m.aesthetic_before.total:m.aesthetic_after.total).toFixed(2)]);
+      }
       $('classification-evidence').hidden=false;
       $('classification-evidence').textContent=(m.classification.status==='certified'?'Belegt: ':'Ungeklärt: ')+m.classification.evidence+
-        '. Original und Ergebnis sind durch protokollierte Umformungen äquivalent. Keine globale Minimalität; gleiche Invarianten beweisen keine Knotenäquivalenz.';
+        (m.source==='manual_image_annotation'?'. Aus manuell gesetzten Stützpunkten und Kreuzungswahlen erzeugt. Die Übereinstimmung mit der Bildvorlage muss beim Abzeichnen geprüft werden.':
+        '. Original und Ergebnis sind durch protokollierte Umformungen äquivalent. Keine globale Minimalität; gleiche Invarianten beweisen keine Knotenäquivalenz.');
     } else $('classification-evidence').hidden=true;
     for(const [label,value] of values) {
       const span=document.createElement('span'), strong=document.createElement('strong');

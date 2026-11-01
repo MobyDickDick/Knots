@@ -290,15 +290,36 @@ Browserprüfung ist damit nicht behauptet.
 
 ## Modul 6: Bild-Abzeichner
 
-Dateien später:
+Status der halbautomatischen ersten Stufe: **umgesetzt am 01.11.2026**.
+
+Dateien:
 
 ```text
 src/knots_grid/image_tracer.py
+src/knots_grid/image_tracer.html
 ```
 
-Nicht als erste Etappe.
+Nach Abschluss von AP-01 ist die dokumentierte erste, halbautomatische Variante
+mit angeklickten Stützpunkten und Kreuzungen verfügbar:
 
-Mögliche Pipeline:
+- [x] Offline-Editor mit lokaler Bildvorlage, Raster und geordneten Stützpunkten.
+- [x] Explizite Über-/Unterwahl für jede Kreuzung sowie Annotation speichern/laden.
+- [x] Reguläre rechtwinklige Projektion vollständig prüfen; unklare Eingaben
+  zurückweisen, statt Über-/Unterangaben zu erraten.
+- [x] Kollisionsfreien Pfad in `Z² × {0,1}` und exakt wiederherstellbaren
+  Turtle-Code erzeugen; feste Gitterverfeinerung und begrenzte Expansion.
+- [x] CLI, Herkunft, konservative Klassifikation, SVG/PNG und Offline-Galerie.
+- [x] Reproduzierbares Trefoil-Beispiel einschließlich Bildvorlage und Annotation.
+- [x] Referenzdiagramme, Spiegel, Kreuzungswahlen, Fehlerfälle, Grenzen,
+  Export-Roundtrip und Editor-Bedienlogik automatisiert prüfen.
+
+Abnahme: 94 Python-Tests sowie Editor- und Galerie-Laufzeittests erfolgreich.
+Das Beispiel erzeugt einen Trefoil mit 102 Gitterpunkten, drei Kreuzungen und
+Determinante 3. Eine visuelle Browserprüfung war wegen der Sperre lokaler
+`file://`-Seiten nicht möglich. Bedienung, Format und geometrische Grenzen:
+[Bild-Abzeichner](image_tracer.md).
+
+Spätere automatische Ausbaustufe (weiter offen):
 
 ```text
 Bild
@@ -316,4 +337,6 @@ Gitterpfad
 Turtle-Code
 ```
 
-Für den Anfang realistischer: halbautomatischer Abzeichner mit angeklickten Stützpunkten und Kreuzungen.
+Die automatische Pixelverarbeitung und das Skelettieren sind weiterhin ein
+separater Ausbau. Die erste Stufe verarbeitet die manuell festgelegte Projektion;
+ihre Übereinstimmung mit der Bildvorlage muss beim Abzeichnen geprüft werden.

@@ -221,6 +221,8 @@ def write_catalog(entries: Iterable[CatalogEntry], directory: str | Path) -> Pat
                 "original_point_count": len(entry.original_points) - 1,
                 "metadata": entry.metadata,
             })
+        elif entry.metadata is not None:
+            records[-1]["metadata"] = entry.metadata
     manifest = target / "catalog.json"
     manifest.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8", newline="\n")
     if entries:

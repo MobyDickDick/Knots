@@ -61,6 +61,27 @@ Der Startpunkt wird am Ende nicht wiederholt; die Schlusskante ist implizit.
 python -m unittest discover -s tests
 ```
 
+## Halbautomatischer Bild-Abzeichner (Modul 6)
+
+Der Offline-Editor in `examples/image_tracer.html` lädt eine lokale Bildvorlage.
+Den Strang als rechtwinklige Linie abklicken, schließen, an jeder Kreuzung den
+oberen Strang wählen und die Annotation als JSON speichern. Danach erzeugt ein
+Aufruf den geprüften Zweischicht-Gitterpfad, Turtle-Code, SVG/PNG und eine
+drehbare Galerie:
+
+```bash
+python -m knots_grid.image_tracer trace annotation.json --output traced_knot
+```
+
+Ein neuer Editor lässt sich mit
+`python -m knots_grid.image_tracer editor --output image_tracer.html` exportieren.
+Das vollständige Beispiel liegt in `examples/image_trace/`: `annotation.json`
+und anschließend `trefoil_reference.png` in den Editor laden oder die fertige
+`index.html` öffnen. `python examples/make_image_trace.py` erzeugt das Beispiel
+erneut. Die Übereinstimmung mit der Bildvorlage hängt von den manuell gesetzten
+Stützpunkten und Kreuzungswahlen ab. Automatische Bilderkennung ist ein späterer
+Ausbau. Format, Bedienung und Grenzen stehen in [docs/image_tracer.md](docs/image_tracer.md).
+
 # Knots
 
 Dieses Repository ist ein experimentelles Projekt für **Knoten und Gitterdiagramme**.

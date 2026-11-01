@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Knoten abzeichnen</title>
+<style>
+:root{color-scheme:light;font-family:system-ui,sans-serif;color:#183047;background:#f0f4f7}*{box-sizing:border-box}
+body{margin:0}main{max-width:1240px;margin:auto;padding:28px}h1{margin:0 0 8px;font-size:30px}p{line-height:1.6}
+.intro{max-width:850px;color:#496074}.tools{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:16px 0}
+button,.file{font:inherit;border:1px solid #a8bac9;border-radius:7px;padding:9px 13px;background:white;color:#183047;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}button[aria-pressed=true],.primary{background:#164f73;color:white;border-color:#164f73}
+input[type=number]{width:76px;padding:7px;font:inherit}input[type=file]{max-width:250px}label{font-size:14px}
+.panel{background:white;border:1px solid #cbd8e1;border-radius:12px;padding:18px}.workspace{overflow:auto;max-height:75vh}
+canvas{display:block;max-width:100%;height:auto;touch-action:manipulation;background:#fff;cursor:crosshair}
+#status{min-height:48px;padding:12px 0;line-height:1.5}#status[data-error=true]{color:#a32424}
+details{margin-top:18px}summary{cursor:pointer}a{color:#164f73}ol{line-height:1.7;padding-left:24px}code{background:#eaf0f5;padding:2px 4px}
+.legend{font-size:14px;color:#496074}.notice{padding:12px;background:#eaf3f8;border-radius:6px}
+@media(max-width:600px){main{padding:16px}h1{font-size:26px}.panel{padding:10px}}
+</style>
+<main>
+<h1>Knoten abzeichnen</h1>
+<p class="intro">Lege eine rechtwinklige Linie über deine Vorlage. Markiere danach an jeder Kreuzung,
+welcher Strang oben liegt. Die gespeicherte Zeichnung lässt sich in einen geprüften Gitterknoten umwandeln.</p>
+<noscript>Für den Abzeichner muss JavaScript aktiviert sein.</noscript>
+<div class="panel">
+<div class="tools">
+<label>Bildvorlage <input id="image" type="file" accept="image/png,image/jpeg,image/webp"></label>
+<label>Raster in Pixeln <input id="spacing" type="number" min="8" max="100" value="24"></label>
+<label><input id="show-image" type="checkbox" checked> Bild anzeigen</label>
+<label>Zeichnung laden <input id="import" type="file" accept=".json,application/json"></label>
+</div>
+<div class="tools">
+<button id="point-mode" aria-pressed="true">1 · Stützpunkte</button>
+<button id="crossing-mode" aria-pressed="false">2 · Kreuzungen</button>
+<button id="close">Linie schließen</button>
+<button id="undo">Letzten Punkt zurück</button>
+<button id="clear">Neue Zeichnung</button>
+<button id="download" class="primary" disabled>Zeichnung speichern</button>
+</div>
+<div id="status" role="status" aria-live="polite"></div>
+<div class="workspace"><canvas id="scene" width="1104" height="720" aria-label="Zeichenfläche mit Raster. Stützpunkte mit Maus oder Touch setzen. Alternativ eine JSON-Zeichnung laden."></canvas></div>
+<p class="legend">Blau: Pfad · Zahlen: Segmentnummern ab 0 · Orange: offene Kreuzungswahl · Grün mit Lücke: gewählter oberer Strang</p>
+</div>
+<details open><summary>So funktioniert es</summary>
+<ol>
+<li>Optional eine Bildvorlage laden. Sie bleibt auf deinem Computer. Das Bild wird proportional auf die Zeichenfläche eingepasst.</li>
+<li>Raster einstellen und die Linie einmal der Reihe nach abklicken. Der nächste Punkt rastet horizontal oder vertikal zum vorherigen ein. Zusätzliche Ecken helfen beim Nachzeichnen runder Bögen. Den Startpunkt nicht nochmals setzen.</li>
+<li>Mit „Linie schließen“ die letzte Strecke zum Start ergänzen. Auch diese muss waagerecht oder senkrecht sein. Bei einer Fehlermeldung den letzten Punkt zurücknehmen und korrigieren.</li>
+<li>Im Modus „Kreuzungen“ auf jeden orangefarbenen Kreis klicken. Ein weiterer Klick wechselt den oberen Strang. Alle Kreuzungen müssen grün sein.</li>
+<li>„Zeichnung speichern“ lädt eine <code>annotation.json</code> herunter. Sie enthält Stützpunkte und Kreuzungswahlen; die Bilddatei bleibt separat. Zum Weiterbearbeiten die Zeichnung und gegebenenfalls das Bild erneut laden.</li>
+</ol>
+<p class="notice">Verwende ein rechtwinkliges Diagramm mit eindeutigen Kreuzungen im Inneren zweier Strecken.
+Berührungen, überlappende Strecken und mehrere Komponenten werden nicht unterstützt. Die Knotentreue zur Bildvorlage hängt von deinen Stützpunkten und Kreuzungswahlen ab.</p>
+</details>
+</main>
+<script>
+// Pure model, also exercised by the Node runtime tests.
+const TracerModel = (() => {
+  const integer = Number.isSafeInteger;
+  function intersections(points) {
+    if (points.length < 4 || points.length > 500) throw Error('Bitte 4 bis 500 Stützpunkte setzen.');
+    if (points.some(p => !Array.isArray(p) || p.length !== 2 || !p.every(integer))) throw Error('Stützpunkte brauchen zwei ganze Koordinaten.');
+    if (new Set(points.map(p=>p.join(','))).size !== points.length) throw Error('Stützpunkte dürfen nicht doppelt vorkommen.');
+    const segments = points.map((a,i)=>[a,points[(i+1)%points.length]]);
+    segments.forEach(([a,b],i)=>{if ((a[0]===b[0]) === (a[1]===b[1])) throw Error(`Segment ${i} muss waagerecht oder senkrecht sein.`);});
+    const result=[];
+    for(let i=0;i<segments.length;i++) for(let j=i+1;j<segments.length;j++) {
+      const [a,b]=segments[i], [c,d]=segments[j], horizontal=a[1]===b[1];
+      let hit;
+      if(horizontal===(c[1]===d[1])) {
+        const axis=horizontal?0:1, fixed=1-axis;
+        if(a[fixed]!==c[fixed]) continue;
+        const lo=Math.max(Math.min(a[axis],b[axis]),Math.min(c[axis],d[axis]));
+        const hi=Math.min(Math.max(a[axis],b[axis]),Math.max(c[axis],d[axis]));
+        if(lo>hi) continue;
+        if(lo<hi) throw Error(`Segmente ${i} und ${j} überlappen sich.`);
+        hit=horizontal?[lo,a[1]]:[a[0],lo];
+      } else {
+        hit=horizontal?[c[0],a[1]]:[a[0],c[1]];
+        if(![[a,b],[c,d]].every(([p,q])=>[0,1].every(k=>Math.min(p[k],q[k])<=hit[k]&&hit[k]<=Math.max(p[k],q[k])))) continue;
+      }
+      const equal=p=>p[0]===hit[0]&&p[1]===hit[1];
+      const adjacent=j===i+1||(i===0&&j===segments.length-1);
+      if(adjacent&&[a,b].some(equal)&&[c,d].some(equal)) continue;
+      if([a,b,c,d].some(equal)) throw Error(`Segmente ${i} und ${j} berühren einen Endpunkt.`);
+      if(result.some(crossing=>equal(crossing.coordinate))) throw Error('Mehr als zwei Stränge an einer Stelle.');
+      result.push({coordinate:hit,segments:[i,j]});
+      if(result.length>500) throw Error('Höchstens 500 Kreuzungen werden unterstützt.');
+    }
+    return result.sort((a,b)=>a.coordinate[0]-b.coordinate[0]||a.coordinate[1]-b.coordinate[1]);
+  }
+  class Drawing {
+    constructor(){this.points=[];this.choices=new Map();this.closed=false;this.source=null;this.view=null;}
+    add(point) {
+      if(this.closed) throw Error('Zum Ändern zuerst den letzten Punkt zurücknehmen.');
+      if(this.points.length>=500) throw Error('Höchstens 500 Stützpunkte.');
+      if(!Array.isArray(point)||point.length!==2||!point.every(integer)) throw Error('Ungültiger Stützpunkt.');
+      point=[...point];
+      if(this.points.length) {
+        const last=this.points.at(-1);
+        if(Math.abs(point[0]-last[0])>=Math.abs(point[1]-last[1])) point[1]=last[1]; else point[0]=last[0];
+      }
+      if(this.points.some(p=>p[0]===point[0]&&p[1]===point[1])) throw Error('Dieser Stützpunkt ist schon belegt.');
+      this.points.push(point);this.choices.clear();
+    }
+    close(){intersections(this.points);this.closed=true;}
+    undo(){this.closed=false;this.points.pop();this.choices.clear();}
+    crossings(){return this.closed?intersections(this.points):[];}
+    choose(coordinate) {
+      const crossing=this.crossings().find(c=>c.coordinate.join(',')===coordinate.join(','));
+      if(!crossing) throw Error('Keine Kreuzung an dieser Stelle.');
+      const key=coordinate.join(','), current=this.choices.get(key);
+      this.choices.set(key,current===crossing.segments[0]?crossing.segments[1]:crossing.segments[0]);
+    }
+    record() {
+      if(!this.closed) throw Error('Bitte zuerst die Linie schließen.');
+      const crossings=this.crossings().map(c=>{
+        const over=this.choices.get(c.coordinate.join(','));
+        if(!c.segments.includes(over)) throw Error('Bitte an jeder Kreuzung den oberen Strang wählen.');
+        return {coordinate:[...c.coordinate],over_segment:over};
+      });
+      return {schema_version:1,source_image:this.source,waypoints:this.points.map(p=>[...p]),crossings,...(this.view?{editor_view:this.view}:{})};
+    }
+    static load(record) {
+      if(record?.schema_version!==1||!Array.isArray(record.waypoints)||!Array.isArray(record.crossings)) throw Error('Ungültiges Zeichnungsformat (Version 1 erwartet).');
+      if(record.source_image!=null&&typeof record.source_image!=='string') throw Error('Ungültiger Bildname.');
+      const found=intersections(record.waypoints), drawing=new Drawing();
+      drawing.points=record.waypoints.map(p=>[...p]);drawing.source=record.source_image??null;drawing.closed=true;
+      const view=record.editor_view;
+      if(view!=null){
+        if(![view.spacing,view.width,view.height].every(integer)||!Array.isArray(view.offset)||view.offset.length!==2||!view.offset.every(integer)
+          ||view.spacing<8||view.spacing>100||view.width<1||view.width>12000||view.height<1||view.height>12000||view.width*view.height>16000000)throw Error('Ungültige Zeichenflächen-Einstellungen.');
+        drawing.view={spacing:view.spacing,width:view.width,height:view.height,offset:[...view.offset]};
+      }
+      record.crossings.forEach(c=>{
+        if(!c||!Array.isArray(c.coordinate)||c.coordinate.length!==2||!c.coordinate.every(integer)||!integer(c.over_segment)) throw Error('Ungültige Kreuzungswahl.');
+        const key=c.coordinate.join(','), pair=found.find(f=>f.coordinate.join(',')===key);
+        if(!pair||!pair.segments.includes(c.over_segment)||drawing.choices.has(key)) throw Error('Kreuzungswahl passt nicht zum Diagramm.');
+        drawing.choices.set(key,c.over_segment);
+      });
+      drawing.record();return drawing;
+    }
+  }
+  return {Drawing,intersections};
+})();
+</script>
+<script>
+(() => {
+  const get=id=>document.getElementById(id), canvas=get('scene'), ctx=canvas.getContext('2d');
+  let drawing=new TracerModel.Drawing(), mode='points', image=null, imageUrl=null, imageRequest=0;
+  let offset=[1,1];
+  const spacing=()=>Number(get('spacing').value);
+  const screen=([x,y])=>[(x+offset[0])*spacing(),(-y+offset[1])*spacing()];
+  const grid=(x,y)=>[Math.round(x/spacing()-offset[0]),Math.round(offset[1]-y/spacing())];
+  function message(text,error=false){get('status').textContent=text;get('status').dataset.error=String(error);}
+  function line(a,b,color,width=3){ctx.beginPath();ctx.moveTo(...screen(a));ctx.lineTo(...screen(b));ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();}
+  function render() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    if(image&&get('show-image').checked){ctx.globalAlpha=.4;ctx.drawImage(image,0,0,canvas.width,canvas.height);ctx.globalAlpha=1;}
+    ctx.lineWidth=1;ctx.strokeStyle='#dfe7ee';
+    for(let x=0;x<=canvas.width;x+=spacing()){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
+    for(let y=0;y<=canvas.height;y+=spacing()){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
+    const pts=drawing.points, count=drawing.closed?pts.length:Math.max(0,pts.length-1);
+    for(let i=0;i<count;i++) {
+      const a=pts[i],b=pts[(i+1)%pts.length];line(a,b,'#17608b');
+      const [x,y]=screen([(a[0]+b[0])/2,(a[1]+b[1])/2]);
+      ctx.font='12px system-ui';ctx.fillStyle='#183047';ctx.fillText(String(i),x+5,y-5);
+    }
+    pts.forEach((p,i)=>{const [x,y]=screen(p);ctx.fillStyle=i===0?'#a32424':'#17608b';ctx.beginPath();ctx.arc(x,y,i===0?5:3,0,2*Math.PI);ctx.fill();});
+    for(const crossing of drawing.crossings()) {
+      const key=crossing.coordinate.join(','), over=drawing.choices.get(key), [x,y]=screen(crossing.coordinate);
+      if(over===undefined){ctx.strokeStyle='#bc6500';ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,y,8,0,2*Math.PI);ctx.stroke();}
+      else {
+        const a=pts[over], b=pts[(over+1)%pts.length], horizontal=a[1]===b[1], delta=.32;
+        const p=[crossing.coordinate[0]-(horizontal?delta:0),crossing.coordinate[1]-(horizontal?0:delta)];
+        const q=[crossing.coordinate[0]+(horizontal?delta:0),crossing.coordinate[1]+(horizontal?0:delta)];
+        line(p,q,'white',9);line(p,q,'#16815b',4);
+      }
+    }
+    let valid=false;try{drawing.record();valid=true;}catch{}
+    get('download').disabled=!valid;get('undo').disabled=!pts.length;get('close').disabled=drawing.closed;
+    get('point-mode').setAttribute('aria-pressed',String(mode==='points'));
+    get('crossing-mode').setAttribute('aria-pressed',String(mode==='crossings'));
+  }
+  function status(){const crossings=drawing.crossings();message(drawing.closed?`${drawing.points.length} Stützpunkte · ${crossings.length} Kreuzungen · ${crossings.length-drawing.choices.size} offene Wahlen. Auf eine Kreuzung klicken, um den oberen Strang zu wählen.`:`${drawing.points.length} Stützpunkte · Linie einmal vollständig abklicken und dann schließen.`);}
+  function action(fn){try{fn();status();}catch(error){message(error.message,true);}render();}
+  canvas.addEventListener('click',event=>action(()=>{
+    const rect=canvas.getBoundingClientRect(), x=(event.clientX-rect.left)*canvas.width/rect.width, y=(event.clientY-rect.top)*canvas.height/rect.height;
+    if(mode==='points'){drawing.add(grid(x,y));return;}
+    let nearest=null, distance=Infinity;
+    for(const c of drawing.crossings()){const [cx,cy]=screen(c.coordinate),d=Math.hypot(cx-x,cy-y);if(d<distance){distance=d;nearest=c;}}
+    if(!nearest||distance>Math.max(12,spacing()*.45)) throw Error('Bitte direkt auf eine markierte Kreuzung klicken.');
+    drawing.choose(nearest.coordinate);
+  }));
+  get('point-mode').addEventListener('click',()=>action(()=>{mode='points';}));
+  get('crossing-mode').addEventListener('click',()=>action(()=>{if(!drawing.closed)drawing.close();mode='crossings';}));
+  get('close').addEventListener('click',()=>action(()=>{drawing.close();mode='crossings';}));
+  get('undo').addEventListener('click',()=>action(()=>{drawing.undo();mode='points';}));
+  get('clear').addEventListener('click',()=>action(()=>{const source=drawing.source;drawing=new TracerModel.Drawing();drawing.source=source;offset=[1,1];mode='points';}));
+  get('spacing').addEventListener('change',()=>{const value=spacing();if(!Number.isInteger(value)||value<8||value>100)get('spacing').value=24;render();});
+  get('show-image').addEventListener('change',render);
+  get('image').addEventListener('change',()=>{
+    const file=get('image').files[0];if(!file)return;
+    const request=++imageRequest, candidate=new Image(), url=URL.createObjectURL(file);
+    candidate.onload=()=>{if(request!==imageRequest){URL.revokeObjectURL(url);return;}if(imageUrl)URL.revokeObjectURL(imageUrl);
+      imageUrl=url;image=candidate;drawing.source=file.name;
+      const factor=Math.min(1,1200/image.naturalWidth,900/image.naturalHeight);
+      canvas.width=Math.round(image.naturalWidth*factor);canvas.height=Math.round(image.naturalHeight*factor);render();message('Bild geladen. Raster einstellen und Stützpunkte setzen.');};
+    candidate.onerror=()=>{URL.revokeObjectURL(url);message('Bild konnte nicht geladen werden.',true);};candidate.src=url;
+  });
+  get('import').addEventListener('change',async()=>{
+    const file=get('import').files[0];if(!file)return;
+    try {
+      const candidate=TracerModel.Drawing.load(JSON.parse(await file.text()));
+      const xs=candidate.points.map(p=>p[0]), ys=candidate.points.map(p=>p[1]);
+      const width=Math.max(...xs)-Math.min(...xs)+2,height=Math.max(...ys)-Math.min(...ys)+2;
+      if(!candidate.view&&(width*8>12000||height*8>12000||Math.max(1104,width*8)*Math.max(720,height*8)>16000000))throw Error('Zeichnung ist für die Zeichenfläche zu groß. Der Python-Konverter kann sie separat prüfen.');
+      drawing=candidate;mode='crossings';offset=candidate.view?.offset??[1-Math.min(...xs),1+Math.max(...ys)];
+      get('spacing').value=candidate.view?.spacing??Math.max(8,Math.min(24,Math.floor(1104/width),Math.floor(720/height)));
+      canvas.width=candidate.view?.width??Math.max(1104,width*spacing());canvas.height=candidate.view?.height??Math.max(720,height*spacing());
+      ++imageRequest;image=null;if(imageUrl)URL.revokeObjectURL(imageUrl);imageUrl=null;
+      status();render();
+    }catch(error){message(error.message,true);}get('import').value='';
+  });
+  get('download').addEventListener('click',()=>action(()=>{
+    drawing.view={spacing:spacing(),width:canvas.width,height:canvas.height,offset:[...offset]};
+    const blob=new Blob([JSON.stringify(drawing.record(),null,2)+'\n'],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;link.download='annotation.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }));
+  status();render();
+})();
+</script>
+</html>

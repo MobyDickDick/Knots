@@ -63,10 +63,9 @@ def render_gallery(entries: Iterable[CatalogEntry], filename: str | Path) -> Pat
             "crossings": len(find_crossings(entry.points)),
             "points": [[p.x, p.y, p.z] for p in entry.points],
         })
-        if entry.original_points is not None:
-            validate_cycle(entry.original_points).raise_for_errors()
-            metadata = entry.metadata
-            if metadata:
+        metadata = entry.metadata
+        if metadata:
+            if "provenance" in metadata:
                 # Generator seeds use 63 bits; JavaScript numbers only retain
                 # 53 integer bits. Keep their displayed provenance exact.
                 provenance = dict(metadata["provenance"])
@@ -74,6 +73,9 @@ def render_gallery(entries: Iterable[CatalogEntry], filename: str | Path) -> Pat
                     if provenance.get(key) is not None:
                         provenance[key] = str(provenance[key])
                 metadata = {**metadata, "provenance": provenance}
+            records[-1]["metadata"] = metadata
+        if entry.original_points is not None:
+            validate_cycle(entry.original_points).raise_for_errors()
             records[-1].update({
                 "original_points": [[p.x, p.y, p.z] for p in entry.original_points],
                 "original_crossings": len(find_crossings(entry.original_points)),
