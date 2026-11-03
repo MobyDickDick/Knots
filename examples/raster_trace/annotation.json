@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "source_image": "trefoil_reference.png",
+  "waypoints": [
+    [
+      3,
+      -1
+    ],
+    [
+      6,
+      -1
+    ],
+    [
+      6,
+      -3
+    ],
+    [
+      4,
+      -3
+    ],
+    [
+      4,
+      -5
+    ],
+    [
+      2,
+      -5
+    ],
+    [
+      2,
+      -2
+    ],
+    [
+      5,
+      -2
+    ],
+    [
+      5,
+      -4
+    ],
+    [
+      3,
+      -4
+    ]
+  ],
+  "crossings": [
+    {
+      "coordinate": [
+        3,
+        -2
+      ],
+      "over_segment": 9
+    },
+    {
+      "coordinate": [
+        4,
+        -4
+      ],
+      "over_segment": 3
+    },
+    {
+      "coordinate": [
+        5,
+        -3
+      ],
+      "over_segment": 7
+    }
+  ],
+  "editor_view": {
+    "spacing": 72,
+    "width": 576,
+    "height": 504,
+    "offset": [
+      0,
+      0
+    ],
+    "pixel_origin": [
+      0,
+      0
+    ]
+  },
+  "recognition": {
+    "algorithm": "grid-sampling-v1",
+    "threshold": 160,
+    "foreground_pixels": 11371,
+    "grid_edges": 24,
+    "inferred_crossings": 3,
+    "unresolved_crossings": 0
+  }
+}

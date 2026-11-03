@@ -15,3 +15,5 @@ build/
 !examples/travel_catalog/*.svg
 !examples/image_trace/*.json
 !examples/image_trace/*.svg
+!examples/raster_trace/*.json
+!examples/raster_trace/*.svg

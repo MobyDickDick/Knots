@@ -1,7 +1,7 @@
-"""Semi-automatic tracing of explicitly annotated rectilinear knot diagrams.
+"""Tracing of reviewed rectilinear knot diagrams from the offline editor.
 
 The offline editor supplies ordered grid waypoints and one over-strand choice
-per crossing. No pixel recognition or unproved rerouting is performed. A fixed
+per crossing, optionally extracted from a raster in the browser. A fixed
 fourfold refinement leaves room for local lifts without changing the diagram.
 """
 
@@ -42,6 +42,8 @@ class DiagramAnnotation:
     crossings: tuple[CrossingChoice, ...] = ()
     source_image: str | None = None
     editor_view: dict | None = None
+    recognition: dict | None = None
+    draft: bool = False
 
 
 def _coordinate(value, label):
@@ -57,6 +59,9 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
         raise ValueError("annotation schema_version must be 1")
     if not isinstance(record.get("waypoints"), list) or not isinstance(record.get("crossings"), list):
         raise ValueError("annotation needs waypoints and crossings lists")
+    draft = record.get("draft", False)
+    if type(draft) is not bool:
+        raise ValueError("annotation draft must be a boolean")
     choices = []
     for index, crossing in enumerate(record["crossings"]):
         if not isinstance(crossing, dict) or type(crossing.get("over_segment")) is not int:
@@ -78,8 +83,22 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
                 or not 1 <= view["height"] <= 12000 or view["width"] * view["height"] > 16_000_000):
             raise ValueError("editor_view dimensions are outside the supported limits")
         view = {**{key: view[key] for key in keys}, "offset": list(offset)}
+        if "pixel_origin" in record["editor_view"]:
+            origin = _coordinate(record["editor_view"]["pixel_origin"], "editor_view pixel_origin")
+            if any(not 0 <= v < view["spacing"] for v in origin):
+                raise ValueError("editor_view pixel_origin must be within one raster cell")
+            view["pixel_origin"] = list(origin)
+    recognition = record.get("recognition")
+    if recognition is not None:
+        counters = ("foreground_pixels", "grid_edges", "inferred_crossings", "unresolved_crossings")
+        if (not isinstance(recognition, dict) or recognition.get("algorithm") != "grid-sampling-v1"
+                or type(recognition.get("threshold")) is not int or not 1 <= recognition["threshold"] <= 254
+                or any(type(recognition.get(k)) is not int or not 0 <= recognition[k] <= 16_000_000
+                       for k in counters)):
+            raise ValueError("invalid raster recognition report")
+        recognition = {k: recognition[k] for k in ("algorithm", "threshold", *counters)}
     return DiagramAnnotation(tuple(_coordinate(p, f"waypoint {i}")
-                                   for i, p in enumerate(record["waypoints"])), tuple(choices), source, view)
+                                   for i, p in enumerate(record["waypoints"])), tuple(choices), source, view, recognition, draft)
 
 
 def annotation_to_dict(annotation: DiagramAnnotation) -> dict:
@@ -89,6 +108,10 @@ def annotation_to_dict(annotation: DiagramAnnotation) -> dict:
                             for c in annotation.crossings]}
     if annotation.editor_view is not None:
         result["editor_view"] = annotation.editor_view
+    if annotation.recognition is not None:
+        result["recognition"] = annotation.recognition
+    if annotation.draft:
+        result["draft"] = True
     return result
 
 
@@ -227,7 +250,7 @@ def write_traced_diagram(annotation: DiagramAnnotation, directory: str | Path,
 
     trace = trace_annotation(annotation, max_vertices=max_vertices)
     classification = classify_knot(trace.points)
-    metadata = {"source": "manual_image_annotation", "refinement": REFINEMENT,
+    metadata = {"source": "reviewed_raster_annotation" if annotation.recognition else "manual_image_annotation", "refinement": REFINEMENT,
                 "annotation": annotation_to_dict(annotation), "turtle_code": trace.code,
                 "classification": asdict(classification), "global_minimality_claimed": False}
     target = Path(directory)

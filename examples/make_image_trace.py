@@ -22,7 +22,7 @@ def build_example():
          (4, 1), (4, -1), (2, -1), (2, -3), (0, -3)),
         (CrossingChoice((1, 0), 3), CrossingChoice((2, -2), 7), CrossingChoice((3, -1), 1)),
         "trefoil_reference.png",
-        {"spacing": 72, "offset": [2, 2], "width": 576, "height": 504},
+        {"spacing": 72, "width": 576, "height": 504, "offset": [2, 2]},
     )
     width, height = 576, 504
     pixels = bytearray(b"\xff\xff\xff" * width * height)

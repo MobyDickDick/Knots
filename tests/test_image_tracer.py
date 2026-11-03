@@ -136,6 +136,42 @@ class ImageTracerTests(unittest.TestCase):
         record.update(source_image="Vorlage.png", editor_view={"spacing": 40, "offset": [4, 7], "width": 800, "height": 600})
         self.assertEqual(annotation_to_dict(annotation_from_dict(record)), record)
 
+    def test_raster_origin_and_recognition_report_survive_export(self):
+        record = annotation_to_dict(annotate_grid_candidate(trefoil_candidate()))
+        record["editor_view"] = {"spacing": 40, "offset": [0, 0], "pixel_origin": [7, 9], "width": 500, "height": 400}
+        record["recognition"] = {"algorithm": "grid-sampling-v1", "threshold": 160,
+                                 "foreground_pixels": 1000, "grid_edges": 24,
+                                 "inferred_crossings": 3, "unresolved_crossings": 0}
+        annotation = annotation_from_dict(record)
+        self.assertEqual(annotation_to_dict(annotation), record)
+        with TemporaryDirectory() as directory:
+            result = json.loads(write_traced_diagram(annotation, directory).read_text())
+            self.assertEqual(result["source"], "reviewed_raster_annotation")
+            self.assertEqual(result["annotation"], record)
+        for origin in ([40, 0], [-1, 0], [1.0, 2], [False, 0], [0]):
+            with self.subTest(origin=origin), self.assertRaises(ValueError):
+                annotation_from_dict({**record, "editor_view": {**record["editor_view"], "pixel_origin": origin}})
+        for report in ([], {}, {**record["recognition"], "algorithm": "unknown"},
+                       {**record["recognition"], "threshold": True},
+                       {**record["recognition"], "threshold": 255},
+                       {**record["recognition"], "grid_edges": -1},
+                       {**record["recognition"], "foreground_pixels": 16_000_001}):
+            with self.subTest(report=report), self.assertRaises(ValueError):
+                annotation_from_dict({**record, "recognition": report})
+
+    def test_draft_with_missing_crossing_choices_cannot_export(self):
+        record = annotation_to_dict(annotate_grid_candidate(trefoil_candidate()))
+        record.update(draft=True, crossings=[])
+        self.assertEqual(annotation_to_dict(annotation_from_dict(record)), record)
+        for bad in (1, "true", None):
+            with self.subTest(draft=bad), self.assertRaises(ValueError):
+                annotation_from_dict({**record, "draft": bad})
+        with TemporaryDirectory() as directory:
+            target = Path(directory) / "result"
+            with self.assertRaisesRegex(ValueError, "missing over/under"):
+                write_traced_diagram(annotation_from_dict(record), target)
+            self.assertFalse(target.exists())
+
     def test_vertex_budget_precedes_expansion_and_counts_layer_switches(self):
         annotation = annotate_grid_candidate(trefoil_candidate())
         size = len(trace_annotation(annotation).points) - 1

@@ -98,11 +98,12 @@ assert.equal(elements['mode-3d'].attributes['aria-pressed'], 'true');
 
 const initial = snapshot();
 const selectedKnot=knots[knots.length>1?1:0];
-if(selectedKnot.metadata?.source==='manual_image_annotation') {
+if(['manual_image_annotation','reviewed_raster_annotation'].includes(selectedKnot.metadata?.source)) {
   assert.equal(elements['version-control'].hidden,true);
   assert.equal(elements['classification-evidence'].hidden,false);
   assert.ok(elements['classification-evidence'].textContent.includes('Bildvorlage'));
-  assert.ok(elements.details.children.some(child=>child.children.some(item=>item.textContent==='Bild-Abzeichner')));
+  const label=selectedKnot.metadata.source==='reviewed_raster_annotation'?'Rastererkennung':'Bild-Abzeichner';
+  assert.ok(elements.details.children.some(child=>child.children.some(item=>item.textContent===label)));
 }
 if(selectedKnot.original_points) {
   assert.equal(elements['version-control'].hidden,false);

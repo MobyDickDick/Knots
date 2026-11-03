@@ -319,7 +319,55 @@ Determinante 3. Eine visuelle Browserprüfung war wegen der Sperre lokaler
 `file://`-Seiten nicht möglich. Bedienung, Format und geometrische Grenzen:
 [Bild-Abzeichner](image_tracer.md).
 
-Spätere automatische Ausbaustufe (weiter offen):
+## Arbeitspaket AP-02: Automatische Erkennung rechtwinkliger Rasterbilder
+
+Status: **umgesetzt am 03.11.2026**. Der Offline-Abzeichner ergänzt die manuelle
+Eingabe um eine begrenzte Pixelpipeline für saubere rechtwinklige Diagramme auf
+einem vom Benutzer eingestellten Raster. Die allgemeine Freihanderkennung
+bleibt ein separates Vorhaben.
+
+```text
+Lokales Bild
+  → dunkle Linie isolieren
+  → rastergebundene Mittellinie und Graph extrahieren
+  → einen geschlossenen Strang durchlaufen
+  → eindeutige Kreuzungslücken auswerten / offene Wahlen ergänzen
+  → Projektion prüfen und Annotation speichern
+  → bestehender geprüfter Gitter-/Turtle-/Galerieexport
+```
+
+Teilaufgaben und Abnahmekriterien:
+
+- [x] Lokale Pixelverarbeitung ohne zusätzliche Pakete, Server oder Netz;
+  Bildgröße, Raster und Erkennungsparameter endlich begrenzen.
+- [x] Dunkle Linien auf hellem Grund isolieren, Transparenz berücksichtigen und
+  eine rastergebundene Mittellinie mit Grad-2-/Grad-4-Knoten extrahieren.
+- [x] Offene Enden, Verzweigungen, Fremdpixel außerhalb des Pfadkorridors und
+  mehrere zyklische Komponenten begründet zurückweisen.
+- [x] Bei Kreuzungen nur aus eindeutigen lokalen Bildlücken eine Überführung
+  vorschlagen. Durchgezogene und unklare Kreuzungen brauchen eine manuelle Wahl.
+- [x] Ergebnisse im vorhandenen Editor anzeigen; unvollständige Entwürfe
+  speichern/laden und den endgültigen Gitterexport bei fehlenden Wahlen sperren.
+- [x] Pixelursprung und Erkennungsbericht im JSON-Roundtrip sowie im
+  Herkunftseintrag der Galerie erhalten; veraltete Berichte bei Änderungen der
+  Punktfolge oder Rasterausrichtung verwerfen.
+- [x] Die vorhandene Trefoil-PNG automatisch bis zum validierten Gitterpfad,
+  exakten Turtle-Code und Offline-Galerie konvertieren. Reproduzierbares Beispiel:
+  `node examples/make_raster_trace.cjs`, Ergebnis `examples/raster_trace/`.
+- [x] Echte PNG-Pixel, Rastervarianten, Fehlerfälle, Grenzen, offene Wahlen,
+  Bedienereignisse, Rotation/Spiegel und den Python-Galerieexport testen.
+
+Abnahme: 96 Python-Tests, Editor- und Raster-Laufzeittests sowie die Galerieprüfungen
+für Standardkatalog, Reisequelle, manuelles und automatisch erkanntes Bildbeispiel.
+Die echte PNG ergibt zehn Stützpunkte, drei eindeutige Überführungen und einen
+Trefoil `T(2,3)` mit 102 Gitterpunkten und Determinante 3. Die Browserrichtlinie
+blockierte die visuelle Prüfung; sie ist nicht als durchgeführt behauptet.
+Algorithmus, Bildkonventionen und Grenzen: [Rastererkennung](raster_tracer.md).
+
+## Nächste Ausbaustufe: allgemeine Bild-Abzeichnung (weiter offen)
+
+AP-02 benötigt einen eingestellten Rasterabstand und Rasterursprung. Für freie
+Kurven und gescannte Vorlagen bleibt die allgemeinere Pipeline offen:
 
 ```text
 Bild
@@ -337,6 +385,7 @@ Gitterpfad
 Turtle-Code
 ```
 
-Die automatische Pixelverarbeitung und das Skelettieren sind weiterhin ein
-separater Ausbau. Die erste Stufe verarbeitet die manuell festgelegte Projektion;
-ihre Übereinstimmung mit der Bildvorlage muss beim Abzeichnen geprüft werden.
+Automatische Rasterbestimmung, allgemeines Skelettieren und die topologisch
+abgesicherte Überführung freier Kurven auf ein rechtwinkliges Raster sind
+weiterhin offen. Die Übereinstimmung der erkannten beziehungsweise manuell
+festgelegten Projektion mit der Bildvorlage muss beim Abzeichnen geprüft werden.

@@ -19,15 +19,22 @@ details{margin-top:18px}summary{cursor:pointer}a{color:#164f73}ol{line-height:1.
 </style>
 <main>
 <h1>Knoten abzeichnen</h1>
-<p class="intro">Lege eine rechtwinklige Linie über deine Vorlage. Markiere danach an jeder Kreuzung,
-welcher Strang oben liegt. Die gespeicherte Zeichnung lässt sich in einen geprüften Gitterknoten umwandeln.</p>
+<p class="intro">Erkenne ein rechtwinkliges Rasterbild automatisch oder zeichne seine Linie nach.
+Prüfe danach den Pfad und die Über-/Unterführung an jeder Kreuzung. Die gespeicherte Zeichnung lässt sich in einen geprüften Gitterknoten umwandeln.</p>
 <noscript>Für den Abzeichner muss JavaScript aktiviert sein.</noscript>
 <div class="panel">
 <div class="tools">
 <label>Bildvorlage <input id="image" type="file" accept="image/png,image/jpeg,image/webp"></label>
 <label>Raster in Pixeln <input id="spacing" type="number" min="8" max="100" value="24"></label>
+<label>Rasterursprung X <input id="origin-x" type="number" min="0" max="99" value="0"></label>
+<label>Y <input id="origin-y" type="number" min="0" max="99" value="0"></label>
 <label><input id="show-image" type="checkbox" checked> Bild anzeigen</label>
 <label>Zeichnung laden <input id="import" type="file" accept=".json,application/json"></label>
+</div>
+<div class="tools">
+<label>Dunkel-Schwelle <input id="threshold" type="number" min="1" max="254" value="160"></label>
+<button id="recognize" disabled>Bild automatisch erkennen</button>
+<button id="draft" disabled>Entwurf speichern</button>
 </div>
 <div class="tools">
 <button id="point-mode" aria-pressed="true">1 · Stützpunkte</button>
@@ -44,6 +51,7 @@ welcher Strang oben liegt. Die gespeicherte Zeichnung lässt sich in einen gepr�
 <details open><summary>So funktioniert es</summary>
 <ol>
 <li>Optional eine Bildvorlage laden. Sie bleibt auf deinem Computer. Das Bild wird proportional auf die Zeichenfläche eingepasst.</li>
+<li>Für ein sauberes rechtwinkliges Rasterbild: Rasterabstand und Rasterursprung so einstellen, dass die Linien auf dem Raster liegen, dann „Bild automatisch erkennen“ wählen. Dunkle Linien auf hellem Grund werden lokal ausgewertet. Das Ergebnis mit der Vorlage vergleichen; orange Kreuzungen brauchen eine manuelle Wahl. „Entwurf speichern“ erhält auch offene Wahlen.</li>
 <li>Raster einstellen und die Linie einmal der Reihe nach abklicken. Der nächste Punkt rastet horizontal oder vertikal zum vorherigen ein. Zusätzliche Ecken helfen beim Nachzeichnen runder Bögen. Den Startpunkt nicht nochmals setzen.</li>
 <li>Mit „Linie schließen“ die letzte Strecke zum Start ergänzen. Auch diese muss waagerecht oder senkrecht sein. Bei einer Fehlermeldung den letzten Punkt zurücknehmen und korrigieren.</li>
 <li>Im Modus „Kreuzungen“ auf jeden orangefarbenen Kreis klicken. Ein weiterer Klick wechselt den oberen Strang. Alle Kreuzungen müssen grün sein.</li>
@@ -90,7 +98,7 @@ const TracerModel = (() => {
     return result.sort((a,b)=>a.coordinate[0]-b.coordinate[0]||a.coordinate[1]-b.coordinate[1]);
   }
   class Drawing {
-    constructor(){this.points=[];this.choices=new Map();this.closed=false;this.source=null;this.view=null;}
+    constructor(){this.points=[];this.choices=new Map();this.closed=false;this.source=null;this.view=null;this.recognition=null;}
     add(point) {
       if(this.closed) throw Error('Zum Ändern zuerst den letzten Punkt zurücknehmen.');
       if(this.points.length>=500) throw Error('Höchstens 500 Stützpunkte.');
@@ -101,10 +109,10 @@ const TracerModel = (() => {
         if(Math.abs(point[0]-last[0])>=Math.abs(point[1]-last[1])) point[1]=last[1]; else point[0]=last[0];
       }
       if(this.points.some(p=>p[0]===point[0]&&p[1]===point[1])) throw Error('Dieser Stützpunkt ist schon belegt.');
-      this.points.push(point);this.choices.clear();
+      this.points.push(point);this.choices.clear();this.recognition=null;
     }
     close(){intersections(this.points);this.closed=true;}
-    undo(){this.closed=false;this.points.pop();this.choices.clear();}
+    undo(){this.closed=false;this.points.pop();this.choices.clear();this.recognition=null;}
     crossings(){return this.closed?intersections(this.points):[];}
     choose(coordinate) {
       const crossing=this.crossings().find(c=>c.coordinate.join(',')===coordinate.join(','));
@@ -112,17 +120,19 @@ const TracerModel = (() => {
       const key=coordinate.join(','), current=this.choices.get(key);
       this.choices.set(key,current===crossing.segments[0]?crossing.segments[1]:crossing.segments[0]);
     }
-    record() {
+    record(allowDraft=false) {
       if(!this.closed) throw Error('Bitte zuerst die Linie schließen.');
-      const crossings=this.crossings().map(c=>{
+      let missing=false;
+      const crossings=this.crossings().flatMap(c=>{
         const over=this.choices.get(c.coordinate.join(','));
-        if(!c.segments.includes(over)) throw Error('Bitte an jeder Kreuzung den oberen Strang wählen.');
-        return {coordinate:[...c.coordinate],over_segment:over};
+        if(!c.segments.includes(over)) {if(!allowDraft)throw Error('Bitte an jeder Kreuzung den oberen Strang wählen.');missing=true;return [];}
+        return [{coordinate:[...c.coordinate],over_segment:over}];
       });
-      return {schema_version:1,source_image:this.source,waypoints:this.points.map(p=>[...p]),crossings,...(this.view?{editor_view:this.view}:{})};
+      return {schema_version:1,source_image:this.source,waypoints:this.points.map(p=>[...p]),crossings,...(missing?{draft:true}:{}),...(this.view?{editor_view:this.view}:{}),...(this.recognition?{recognition:this.recognition}:{})};
     }
     static load(record) {
       if(record?.schema_version!==1||!Array.isArray(record.waypoints)||!Array.isArray(record.crossings)) throw Error('Ungültiges Zeichnungsformat (Version 1 erwartet).');
+      if(record.draft!==undefined&&typeof record.draft!=='boolean')throw Error('Ungültige Entwurfsmarkierung.');
       if(record.source_image!=null&&typeof record.source_image!=='string') throw Error('Ungültiger Bildname.');
       const found=intersections(record.waypoints), drawing=new Drawing();
       drawing.points=record.waypoints.map(p=>[...p]);drawing.source=record.source_image??null;drawing.closed=true;
@@ -131,6 +141,16 @@ const TracerModel = (() => {
         if(![view.spacing,view.width,view.height].every(integer)||!Array.isArray(view.offset)||view.offset.length!==2||!view.offset.every(integer)
           ||view.spacing<8||view.spacing>100||view.width<1||view.width>12000||view.height<1||view.height>12000||view.width*view.height>16000000)throw Error('Ungültige Zeichenflächen-Einstellungen.');
         drawing.view={spacing:view.spacing,width:view.width,height:view.height,offset:[...view.offset]};
+        if(view.pixel_origin!=null){
+          if(!Array.isArray(view.pixel_origin)||view.pixel_origin.length!==2||!view.pixel_origin.every(v=>integer(v)&&v>=0&&v<view.spacing))throw Error('Ungültiger Rasterursprung.');
+          drawing.view.pixel_origin=[...view.pixel_origin];
+        }
+      }
+      if(record.recognition!=null){
+        const r=record.recognition;
+        if(r.algorithm!=='grid-sampling-v1'||!integer(r.threshold)||r.threshold<1||r.threshold>254
+          ||!['foreground_pixels','grid_edges','inferred_crossings','unresolved_crossings'].every(k=>integer(r[k])&&r[k]>=0&&r[k]<=16000000))throw Error('Ungültiger Erkennungsbericht.');
+        drawing.recognition={algorithm:r.algorithm,threshold:r.threshold,...Object.fromEntries(['foreground_pixels','grid_edges','inferred_crossings','unresolved_crossings'].map(k=>[k,r[k]]))};
       }
       record.crossings.forEach(c=>{
         if(!c||!Array.isArray(c.coordinate)||c.coordinate.length!==2||!c.coordinate.every(integer)||!integer(c.over_segment)) throw Error('Ungültige Kreuzungswahl.');
@@ -138,10 +158,111 @@ const TracerModel = (() => {
         if(!pair||!pair.segments.includes(c.over_segment)||drawing.choices.has(key)) throw Error('Kreuzungswahl passt nicht zum Diagramm.');
         drawing.choices.set(key,c.over_segment);
       });
-      drawing.record();return drawing;
+      drawing.record(record.draft===true);return drawing;
     }
   }
   return {Drawing,intersections};
+})();
+
+// Grid-constrained centreline extraction. No network, libraries or guessed crossings.
+const RasterTracer = (() => {
+  function recognize({data,width,height}, {spacing=24,origin=[0,0],threshold=160}={}) {
+    const integer=Number.isSafeInteger;
+    if(!integer(width)||!integer(height)||width<1||height<1||width>1200||height>900||!data||data.length!==width*height*4)
+      throw Error('Erkennung unterstützt höchstens 1200 × 900 Pixel.');
+    if(!integer(spacing)||spacing<8||spacing>100||!Array.isArray(origin)||origin.length!==2||!origin.every(v=>integer(v)&&v>=0&&v<spacing)
+      ||!integer(threshold)||threshold<1||threshold>254)throw Error('Rasterabstand, Ursprung oder Dunkel-Schwelle ungültig.');
+    const mask=new Uint8Array(width*height);let foreground=0;
+    for(let i=0;i<mask.length;i++) {
+      const k=4*i, alpha=data[k+3]/255;
+      const light=(.299*data[k]+.587*data[k+1]+.114*data[k+2])*alpha+255*(1-alpha);
+      if(light<threshold){mask[i]=1;foreground++;}
+    }
+    if(!foreground)throw Error('Keine dunkle Linie gefunden. Dunkel-Schwelle prüfen.');
+    const cols=Math.floor((width-1-origin[0])/spacing)+1, rows=Math.floor((height-1-origin[1])/spacing)+1;
+    const adjacency=new Map(), edges=[], radius=Math.max(1,Math.floor(spacing*.12));
+    const xy=id=>[origin[0]+(id%cols)*spacing,origin[1]+Math.floor(id/cols)*spacing];
+    const ink=(x,y)=>x>=0&&y>=0&&x<width&&y<height&&mask[y*width+x]===1;
+    function sample(x,y,horizontal,lo,hi,band) {
+      let count=0, total=0, deviation=0;
+      for(let t=lo;t<=hi;t++) {
+        let nearest=Infinity;
+        for(let d=-band;d<=band;d++)if(ink(x+(horizontal?t:d),y+(horizontal?d:t)))nearest=Math.min(nearest,Math.abs(d));
+        if(nearest!==Infinity){count++;deviation+=nearest;}total++;
+      }
+      return {support:count/total, deviation:count?deviation/count:0};
+    }
+    for(let row=0;row<rows;row++)for(let col=0;col<cols;col++) {
+      const a=row*cols+col, [x,y]=xy(a);
+      for(const horizontal of [true,false]) {
+        if(horizontal?col+1>=cols:row+1>=rows)continue;
+        const s=sample(x,y,horizontal,Math.ceil(spacing*.40),Math.floor(spacing*.60),radius);
+        if(s.support<=.15)continue;
+        if(s.support<.85||s.deviation>Math.max(1,spacing*.03))throw Error(`Linie bei Pixel (${x}, ${y}) liegt nicht eindeutig auf dem Raster. Abstand, Ursprung und Schwelle prüfen.`);
+        const b=a+(horizontal?1:cols);edges.push([a,b]);
+        for(const [u,v] of [[a,b],[b,a]]){if(!adjacency.has(u))adjacency.set(u,[]);adjacency.get(u).push(v);}
+      }
+    }
+    if(!edges.length)throw Error('Keine Rasterkanten gefunden. Abstand und Ursprung prüfen.');
+    for(const neighbors of adjacency.values())if(neighbors.length!==2&&neighbors.length!==4)
+      throw Error('Offene Linie oder Verzweigung gefunden. Nur geschlossene rechtwinklige Diagramme werden unterstützt.');
+    for(const [id,neighbors] of adjacency) {
+      const [x,y]=xy(id),crossing=neighbors.length===4;
+      if(!ink(x,y))throw Error('Unterbrochene Linie am Rasterpunkt. Nur Kreuzungen mit sichtbarem oberem Strang sind zulässig.');
+      for(const neighbor of neighbors) {
+        const [nx,ny]=xy(neighbor),horizontal=ny===y,sign=neighbor>id?1:-1;
+        const lo=Math.max(1,Math.ceil(spacing*(crossing ? .40 : .02))),hi=Math.floor(spacing*(crossing ? .48 : .40));
+        const support=sample(x,y,horizontal,sign>0?lo:-hi,sign>0?hi:-lo,Math.max(0,Math.floor(spacing*.02))).support;
+        if(support<.85)throw Error('Unterbrochene oder versetzte Linie zwischen Rasterkanten. Vorlage prüfen.');
+      }
+    }
+    // Every dark pixel must be explained by a narrow corridor around an extracted edge.
+    const covered=new Uint8Array(mask.length), corridor=Math.max(2,Math.floor(spacing*.16));
+    for(const [a,b] of edges){
+      const [ax,ay]=xy(a),[bx,by]=xy(b);
+      for(let y=Math.max(0,ay-corridor);y<=Math.min(height-1,by+corridor);y++)
+        for(let x=Math.max(0,ax-corridor);x<=Math.min(width-1,bx+corridor);x++)covered[y*width+x]=1;
+    }
+    for(let i=0;i<mask.length;i++)if(mask[i]&&!covered[i])throw Error('Dunkle Bildteile außerhalb des erkannten Pfades. Vorlage bereinigen oder manuell abzeichnen.');
+    const key=(a,b)=>a<b?`${a}:${b}`:`${b}:${a}`;
+    const corner=id=>{const n=adjacency.get(id);return n.length===2&&n[0]+n[1]!==2*id;};
+    const start=[...adjacency.keys()].filter(corner).sort((a,b)=>a-b)[0];
+    if(start===undefined)throw Error('Kein geschlossener Strang mit Ecken gefunden.');
+    const visited=new Set(), walk=[start];let previous=start,current=Math.min(...adjacency.get(start));
+    while(true) {
+      const edge=key(previous,current);
+      if(visited.has(edge))throw Error('Pfad ist nicht eindeutig geschlossen.');
+      visited.add(edge);
+      if(current===start)break;
+      walk.push(current);
+      const neighbors=adjacency.get(current);
+      const next=neighbors.length===4?2*current-previous:neighbors.find(n=>n!==previous);
+      if(!neighbors.includes(next))throw Error('Kreuzung lässt sich nicht geradlinig durchlaufen.');
+      previous=current;current=next;
+    }
+    if(visited.size!==edges.length)throw Error('Mehrere geschlossene Komponenten gefunden. Nur ein Strang wird unterstützt.');
+    const waypoints=walk.filter(corner).map(id=>[id%cols,-Math.floor(id/cols)]);
+    const found=TracerModel.intersections(waypoints), crossings=[];
+    for(const crossing of found) {
+      const [col,negativeRow]=crossing.coordinate,[x,y]=xy(-negativeRow*cols+col);
+      const lo=Math.max(2,Math.ceil(spacing*.07)),hi=Math.max(lo,Math.floor(spacing*.11));
+      const band=Math.max(0,Math.floor(spacing*.02));
+      const support=horizontal=>(sample(x,y,horizontal,lo,hi,band).support+sample(x,y,horizontal,-hi,-lo,band).support)/2;
+      const h=support(true),v=support(false);
+      let horizontal;
+      if(h>=.85&&v<=.15)horizontal=true;
+      else if(v>=.85&&h<=.15)horizontal=false;
+      else continue; // Continuous or ambiguous ink never supplies an over/under guess.
+      const over=crossing.segments.find(i=>(waypoints[i][1]===waypoints[(i+1)%waypoints.length][1])===horizontal);
+      crossings.push({coordinate:crossing.coordinate,over_segment:over});
+    }
+    const unresolved=found.length-crossings.length;
+    return {schema_version:1,source_image:null,waypoints,crossings,...(unresolved?{draft:true}:{}),
+      editor_view:{spacing,offset:[0,0],pixel_origin:[...origin],width,height},
+      recognition:{algorithm:'grid-sampling-v1',threshold,foreground_pixels:foreground,grid_edges:edges.length,
+        inferred_crossings:crossings.length,unresolved_crossings:unresolved}};
+  }
+  return {recognize};
 })();
 </script>
 <script>
@@ -150,16 +271,17 @@ const TracerModel = (() => {
   let drawing=new TracerModel.Drawing(), mode='points', image=null, imageUrl=null, imageRequest=0;
   let offset=[1,1];
   const spacing=()=>Number(get('spacing').value);
-  const screen=([x,y])=>[(x+offset[0])*spacing(),(-y+offset[1])*spacing()];
-  const grid=(x,y)=>[Math.round(x/spacing()-offset[0]),Math.round(offset[1]-y/spacing())];
+  const origin=()=>[Number(get('origin-x').value),Number(get('origin-y').value)];
+  const screen=([x,y])=>[(x+offset[0])*spacing()+origin()[0],(-y+offset[1])*spacing()+origin()[1]];
+  const grid=(x,y)=>[Math.round((x-origin()[0])/spacing()-offset[0]),Math.round(offset[1]-(y-origin()[1])/spacing())];
   function message(text,error=false){get('status').textContent=text;get('status').dataset.error=String(error);}
   function line(a,b,color,width=3){ctx.beginPath();ctx.moveTo(...screen(a));ctx.lineTo(...screen(b));ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();}
   function render() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
     if(image&&get('show-image').checked){ctx.globalAlpha=.4;ctx.drawImage(image,0,0,canvas.width,canvas.height);ctx.globalAlpha=1;}
     ctx.lineWidth=1;ctx.strokeStyle='#dfe7ee';
-    for(let x=0;x<=canvas.width;x+=spacing()){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
-    for(let y=0;y<=canvas.height;y+=spacing()){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
+    for(let x=origin()[0];x<=canvas.width;x+=spacing()){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
+    for(let y=origin()[1];y<=canvas.height;y+=spacing()){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
     const pts=drawing.points, count=drawing.closed?pts.length:Math.max(0,pts.length-1);
     for(let i=0;i<count;i++) {
       const a=pts[i],b=pts[(i+1)%pts.length];line(a,b,'#17608b');
@@ -179,6 +301,7 @@ const TracerModel = (() => {
     }
     let valid=false;try{drawing.record();valid=true;}catch{}
     get('download').disabled=!valid;get('undo').disabled=!pts.length;get('close').disabled=drawing.closed;
+    get('draft').disabled=!drawing.closed;get('recognize').disabled=!image;
     get('point-mode').setAttribute('aria-pressed',String(mode==='points'));
     get('crossing-mode').setAttribute('aria-pressed',String(mode==='crossings'));
   }
@@ -197,15 +320,17 @@ const TracerModel = (() => {
   get('close').addEventListener('click',()=>action(()=>{drawing.close();mode='crossings';}));
   get('undo').addEventListener('click',()=>action(()=>{drawing.undo();mode='points';}));
   get('clear').addEventListener('click',()=>action(()=>{const source=drawing.source;drawing=new TracerModel.Drawing();drawing.source=source;offset=[1,1];mode='points';}));
-  get('spacing').addEventListener('change',()=>{const value=spacing();if(!Number.isInteger(value)||value<8||value>100)get('spacing').value=24;render();});
+  function rasterChanged(){const value=spacing();if(!Number.isInteger(value)||value<8||value>100)get('spacing').value=24;
+    for(const id of ['origin-x','origin-y']){const n=Number(get(id).value);if(!Number.isInteger(n)||n<0||n>=spacing())get(id).value=0;}drawing.recognition=null;drawing.view=null;render();}
+  for(const id of ['spacing','origin-x','origin-y'])get(id).addEventListener('change',rasterChanged);
   get('show-image').addEventListener('change',render);
   get('image').addEventListener('change',()=>{
     const file=get('image').files[0];if(!file)return;
     const request=++imageRequest, candidate=new Image(), url=URL.createObjectURL(file);
     candidate.onload=()=>{if(request!==imageRequest){URL.revokeObjectURL(url);return;}if(imageUrl)URL.revokeObjectURL(imageUrl);
-      imageUrl=url;image=candidate;drawing.source=file.name;
+      imageUrl=url;image=candidate;if(drawing.source!==file.name)drawing.recognition=null;drawing.source=file.name;
       const factor=Math.min(1,1200/image.naturalWidth,900/image.naturalHeight);
-      canvas.width=Math.round(image.naturalWidth*factor);canvas.height=Math.round(image.naturalHeight*factor);render();message('Bild geladen. Raster einstellen und Stützpunkte setzen.');};
+      canvas.width=drawing.view?.width??Math.round(image.naturalWidth*factor);canvas.height=drawing.view?.height??Math.round(image.naturalHeight*factor);render();message('Bild geladen. Raster einstellen und automatisch erkennen oder Stützpunkte setzen.');};
     candidate.onerror=()=>{URL.revokeObjectURL(url);message('Bild konnte nicht geladen werden.',true);};candidate.src=url;
   });
   get('import').addEventListener('change',async()=>{
@@ -217,16 +342,32 @@ const TracerModel = (() => {
       if(!candidate.view&&(width*8>12000||height*8>12000||Math.max(1104,width*8)*Math.max(720,height*8)>16000000))throw Error('Zeichnung ist für die Zeichenfläche zu groß. Der Python-Konverter kann sie separat prüfen.');
       drawing=candidate;mode='crossings';offset=candidate.view?.offset??[1-Math.min(...xs),1+Math.max(...ys)];
       get('spacing').value=candidate.view?.spacing??Math.max(8,Math.min(24,Math.floor(1104/width),Math.floor(720/height)));
+      get('origin-x').value=candidate.view?.pixel_origin?.[0]??0;get('origin-y').value=candidate.view?.pixel_origin?.[1]??0;
       canvas.width=candidate.view?.width??Math.max(1104,width*spacing());canvas.height=candidate.view?.height??Math.max(720,height*spacing());
       ++imageRequest;image=null;if(imageUrl)URL.revokeObjectURL(imageUrl);imageUrl=null;
       status();render();
     }catch(error){message(error.message,true);}get('import').value='';
   });
-  get('download').addEventListener('click',()=>action(()=>{
-    drawing.view={spacing:spacing(),width:canvas.width,height:canvas.height,offset:[...offset]};
-    const blob=new Blob([JSON.stringify(drawing.record(),null,2)+'\n'],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
-    link.href=url;link.download='annotation.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  }));
+  get('recognize').addEventListener('click',()=>{
+    try{
+      if(!image)throw Error('Bitte zuerst eine Bildvorlage laden.');
+      // Read a clean canvas, never the grid, annotations or faded display layer.
+      const raw=document.createElement('canvas');raw.width=canvas.width;raw.height=canvas.height;
+      const context=raw.getContext('2d');context.drawImage(image,0,0,raw.width,raw.height);
+      const record=RasterTracer.recognize(context.getImageData(0,0,raw.width,raw.height),{spacing:spacing(),origin:origin(),threshold:Number(get('threshold').value)});
+      record.source_image=drawing.source;
+      const candidate=TracerModel.Drawing.load(record);drawing=candidate;offset=[0,0];mode='crossings';
+      render();message(`Erkannt: ${drawing.points.length} Stützpunkte, ${drawing.choices.size} eindeutige Kreuzungswahlen, ${drawing.recognition.unresolved_crossings} offene Wahlen. Ergebnis mit der Vorlage vergleichen und offene Kreuzungen wählen.`);
+    }catch(error){message(error.message,true);}
+  });
+  function download(allowDraft){action(()=>{
+    drawing.view={spacing:spacing(),width:canvas.width,height:canvas.height,offset:[...offset],...(origin().some(v=>v!==0)?{pixel_origin:origin()}:{})};
+    const record=drawing.record(allowDraft);
+    const blob=new Blob([JSON.stringify(record,null,2)+'\n'],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;link.download=record.draft?'draft.json':'annotation.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  });}
+  get('download').addEventListener('click',()=>download(false));
+  get('draft').addEventListener('click',()=>download(true));
   status();render();
 })();
 </script>

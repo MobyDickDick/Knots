@@ -6,6 +6,12 @@ PNG-, JPEG- oder WebP-Bild als Hintergrund und speichert eine Annotation als JSO
 Es gibt weder Server noch externe Bibliotheken oder Netzwerkanfragen.
 Die Bilddatei bleibt separat und wird nicht in die Annotation eingebettet.
 
+Seit AP-02 kann der Editor saubere rechtwinklige Rasterbilder auch direkt aus
+den Pixeln erkennen. Rasterabstand und Pixelursprung werden eingestellt;
+Kreuzungslücken werden ausgewertet und unklare Wahlen bleiben offen. Details:
+[Automatische Rastererkennung](raster_tracer.md). Der folgende manuelle Ablauf
+bleibt verfügbar.
+
 ## Bedienung
 
 Nach `python -m pip install -e .` im Projektverzeichnis:
@@ -71,7 +77,14 @@ braucht genau einen Eintrag:
 `over_segment` muss eines der zwei tatsächlich beteiligten Segmente sein.
 Zusätzliche, doppelte, fehlende und nicht passende Angaben führen zum Fehler.
 Optionales `editor_view` enthält `spacing`, `offset`, `width` und `height` für
-die Bildausrichtung; die Gitterkonvertierung hängt davon nicht ab.
+die Bildausrichtung; zusätzlich kann `pixel_origin: [x, y]` zwei ganze
+Pixelversätze innerhalb einer Rasterzelle speichern. Die Gitterkonvertierung
+hängt davon nicht ab. Automatisch erzeugte Annotationen enthalten außerdem
+einen `recognition`-Bericht, der beim Python-Export erhalten bleibt.
+
+Ein mit `draft: true` gekennzeichneter Entwurf darf fehlende Kreuzungswahlen
+enthalten und lässt sich im Editor weiterbearbeiten. Der Python-Konverter
+weist fehlende Wahlen weiterhin zurück und erzeugt dafür keinen Galerieexport.
 
 ```python
 import json
@@ -115,7 +128,8 @@ der Expansion geprüft. Die geometrische Prüfung vergleicht endlich viele
 Segmentpaare, ohne Routensuche. Ungültige Eingaben führen vor dem Export zu
 einer Fehlermeldung und CLI-Status 2.
 
-Die erste Stufe erkennt keine Pixel, Skelette oder Kreuzungen im Bild. Freie
+Die manuelle erste Stufe erkennt keine Pixel. AP-02 ergänzt eine auf ein
+eingestelltes rechtwinkliges Raster beschränkte Mittellinienerkennung. Freie
 Kurven, automatische Umroutung, mehrere Komponenten, Verschieben einzelner
 Stützpunkte und eine vollständige Tastatur-Zeichenbedienung sind nicht enthalten.
 
