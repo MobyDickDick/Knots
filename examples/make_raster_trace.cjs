@@ -17,7 +17,7 @@ for(let y=0;y<height;y++) {
 const html=fs.readFileSync(path.join(root,'src/knots_grid/image_tracer.html'),'utf8');
 const box={};vm.createContext(box);
 vm.runInContext([...html.matchAll(/<script>([\s\S]*?)<\/script>/g)][0][1]+'\nglobalThis.raster=RasterTracer;',box);
-const record=box.raster.recognize({data,width,height},{spacing:72});
+const record=box.raster.recognizeAuto({data,width,height});
 record.source_image='trefoil_reference.png';
 if(record.draft)throw Error('Reference should have three unambiguous crossing gaps');
 fs.mkdirSync(target,{recursive:true});

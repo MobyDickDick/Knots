@@ -159,6 +159,26 @@ class ImageTracerTests(unittest.TestCase):
             with self.subTest(report=report), self.assertRaises(ValueError):
                 annotation_from_dict({**record, "recognition": report})
 
+    def test_automatic_grid_report_roundtrip_and_validation(self):
+        record = annotation_to_dict(annotate_grid_candidate(trefoil_candidate()))
+        grid = {"algorithm": "line-bands-v1", "tested_grids": 2,
+                "horizontal_lines": 5, "vertical_lines": 5}
+        report = {"algorithm": "grid-sampling-v1", "threshold": 160,
+                  "foreground_pixels": 1000, "grid_edges": 24,
+                  "inferred_crossings": 3, "unresolved_crossings": 0, "grid_detection": grid}
+        record["recognition"] = report
+        annotation = annotation_from_dict(record)
+        self.assertEqual(annotation_to_dict(annotation), record)
+        with TemporaryDirectory() as directory:
+            result = json.loads(write_traced_diagram(annotation, directory).read_text())
+            self.assertEqual(result["annotation"]["recognition"]["grid_detection"], grid)
+        for bad in (None, [], {}, {**grid, "algorithm": "unknown"},
+                    {**grid, "tested_grids": True}, {**grid, "tested_grids": 0},
+                    {**grid, "tested_grids": 17}, {**grid, "horizontal_lines": 1},
+                    {**grid, "vertical_lines": 1201}, {**grid, "horizontal_lines": 3.0}):
+            with self.subTest(grid=bad), self.assertRaises(ValueError):
+                annotation_from_dict({**record, "recognition": {**report, "grid_detection": bad}})
+
     def test_draft_with_missing_crossing_choices_cannot_export(self):
         record = annotation_to_dict(annotate_grid_candidate(trefoil_candidate()))
         record.update(draft=True, crossings=[])

@@ -13,6 +13,7 @@ vm.createContext(box);
 vm.runInContext([...html.matchAll(/<script>([\s\S]*?)<\/script>/g)][0][1] +
   '\nglobalThis.raster=RasterTracer;globalThis.model=TracerModel;', box);
 const recognize = (image, options) => JSON.parse(JSON.stringify(box.raster.recognize(image, options)));
+const recognizeAuto = (image, options) => JSON.parse(JSON.stringify(box.raster.recognizeAuto(image, options)));
 
 // Decode the actual dependency-free RGB example, including all IDAT chunks.
 function referenceRaster() {
@@ -62,6 +63,19 @@ assert.equal(actual.crossings.length,3);
 assert.equal(actual.recognition.unresolved_crossings,0);
 assert.equal(actual.draft,undefined);
 assert.deepEqual(recognize(referenceRaster(),{spacing:72}),actual,'raster recognition is deterministic');
+const automatic=recognizeAuto(referenceRaster());
+assert.equal(automatic.editor_view.spacing,72);
+assert.deepEqual(automatic.editor_view.pixel_origin,[0,0]);
+assert.deepEqual(automatic.waypoints,actual.waypoints);
+assert.deepEqual(automatic.crossings,actual.crossings);
+assert.equal(automatic.recognition.grid_detection.algorithm,'line-bands-v1');
+assert.deepEqual(recognizeAuto(referenceRaster()),automatic,'automatic grid selection is deterministic');
+assert.deepEqual(JSON.parse(JSON.stringify(box.model.Drawing.load(automatic).record())),automatic);
+for(const grid of [null,[],{}, {...automatic.recognition.grid_detection,tested_grids:0},
+  {...automatic.recognition.grid_detection,tested_grids:17},
+  {...automatic.recognition.grid_detection,horizontal_lines:1},
+  {...automatic.recognition.grid_detection,vertical_lines:1201}])
+  assert.throws(()=>box.model.Drawing.load({...automatic,recognition:{...automatic.recognition,grid_detection:grid}}),/Raster-Erkennungsbericht/);
 
 const square=[[1,-1],[4,-1],[4,-4],[1,-4]];
 for(const spacing of [8,24,40,72,100])for(const origin of [[0,0],[3,5]]) {
@@ -74,6 +88,22 @@ for(const spacing of [8,24,40,72,100])for(const origin of [[0,0],[3,5]]) {
 }
 const fixture=JSON.parse(fs.readFileSync(path.join(root,'examples/image_trace/annotation.json'),'utf8'));
 const pts=fixture.waypoints.map(([x,y])=>[x+2,y-2]);
+for(const spacing of [8,13,24,40,72,100])for(const origin of [[0,0],[3,5],[spacing-1,spacing-1]]) {
+  const record=recognizeAuto(paint(pts,{spacing,origin,width:800,height:800}));
+  assert.equal(record.editor_view.spacing,spacing);
+  assert.deepEqual(record.editor_view.pixel_origin,origin);
+  assert.equal(record.waypoints.length,10);
+  assert.equal(record.recognition.unresolved_crossings,3);
+  assert.equal(record.draft,true,'grid inference never guesses continuous over/under crossings');
+}
+const coarse=recognizeAuto(paint(square));
+assert.equal(coarse.editor_view.spacing,60,'choose coarsest accepted exact grid when intervening lines are absent');
+// Different horizontal / vertical periods can use their common subdivision.
+const rectangular=recognizeAuto(paint([[1,-1],[5,-1],[5,-4],[1,-4]],{spacing:24,origin:[7,11]}));
+assert.equal(rectangular.editor_view.spacing,24);
+assert.deepEqual(rectangular.editor_view.pixel_origin,[7,11]);
+assert.throws(()=>recognizeAuto(paint([[1,-1],[3,-1],[3,-4],[1,-4]],{spacing:7})),/Kein geprüftes Raster/);
+assert.equal(recognizeAuto(paint(square,{color:180}),{threshold:200}).waypoints.length,4);
 const unresolved=recognize(paint(pts),{spacing:40});
 assert.equal(unresolved.draft,true);
 assert.equal(unresolved.recognition.unresolved_crossings,3);
@@ -87,6 +117,7 @@ drawing.undo();assert.equal(drawing.recognition,null,'geometry edits discard sta
 
 const transparent=paint(square,{alpha:0});
 assert.throws(()=>recognize(transparent),/Keine dunkle Linie/,'transparent black is white background');
+assert.throws(()=>recognizeAuto(transparent),/Keine dunkle Linie/);
 const gray=paint(square,{color:180});
 assert.throws(()=>recognize(gray),/Keine dunkle Linie/);
 assert.equal(recognize(gray,{spacing:40,threshold:200}).waypoints.length,4);
@@ -94,13 +125,19 @@ const offGrid=paint(square,{origin:[10,10]});
 assert.throws(()=>recognize(offGrid,{spacing:40}),/Raster|außerhalb/);
 const noise=paint(square);noise.data.set([0,0,0,255],4*(280*320+280));
 assert.throws(()=>recognize(noise,{spacing:40}),/außerhalb/);
+assert.throws(()=>recognizeAuto(noise),/Kein geprüftes Raster/,'no proposal bypasses foreign-pixel validation');
 const open=paint(square);
 for(let y=30;y<=50;y++)for(let x=70;x<=90;x++)open.data.set([255,255,255,255],4*(y*320+x));
 assert.throws(()=>recognize(open,{spacing:40}),/Offene|Unterbrochene/);
+assert.throws(()=>recognizeAuto(open),/Kein geprüftes Raster/);
 const two=paint(square);
 const other=paint([[5,-5],[6,-5],[6,-6],[5,-6]]);
 for(let i=0;i<two.data.length;i+=4)if(other.data[i]<160)two.data.set(other.data.subarray(i,i+4),i);
 assert.throws(()=>recognize(two,{spacing:40}),/Mehrere/);
+assert.throws(()=>recognizeAuto(two),/Kein geprüftes Raster/);
+assert.throws(()=>recognizeAuto(paint([[1,-1],[4,-1],[4,-1],[1,-1]])),/Raster nicht bestimmbar/);
+assert.throws(()=>recognizeAuto(paint(square),{threshold:0}),/ungültig/);
+assert.throws(()=>recognizeAuto({width:1201,height:1,data:new Uint8ClampedArray(1201*4)}),/höchstens/);
 for(const options of [{spacing:7},{spacing:101},{spacing:8.5},{origin:[-1,0]},{origin:[24,0]},{threshold:0},{threshold:255}])
   assert.throws(()=>recognize(paint(square),options),/ungültig/);
 assert.throws(()=>recognize({width:1201,height:1,data:new Uint8ClampedArray(1201*4)}),/höchstens/);
@@ -110,12 +147,12 @@ assert.throws(()=>recognize({width:10,height:10,data:[]}),/höchstens/);
 const tempRoot=fs.realpathSync(os.tmpdir());
 const directory=fs.mkdtempSync(path.join(tempRoot,'knots-raster-'));
 try {
-  const records=[actual];
+  const records=[automatic];
   // Rotations and a mirror exercise both inferred over-strand axes and chirality.
   for(const mirror of [false,true])for(let turns=0;turns<4;turns++) {
     const transform=([x,y])=>{if(mirror)x=-x;for(let k=0;k<turns;k++)[x,y]=[-y,x];return [x+4,y-4];};
-    const record=recognize(paint(fixture.waypoints.map(transform),{width:440,height:440,
-      gaps:fixture.crossings.map(c=>({coordinate:transform(c.coordinate),horizontal:turns%2===1}))}),{spacing:40});
+    const record=recognizeAuto(paint(fixture.waypoints.map(transform),{width:440,height:440,
+      gaps:fixture.crossings.map(c=>({coordinate:transform(c.coordinate),horizontal:turns%2===1}))}));
     assert.equal(record.crossings.length,3);
     records.push(record);
   }
@@ -150,6 +187,7 @@ write_traced_diagram(annotation_from_dict(records[0]), root/'gallery')
 metadata=json.loads((root/'gallery'/'trace.json').read_text())
 assert metadata['source']=='reviewed_raster_annotation'
 assert metadata['classification']['name']=='T(2,3)'
+assert metadata['annotation']['recognition']['grid_detection']==records[0]['recognition']['grid_detection']
 print('Raster-to-grid pipeline: signed trefoil, rotations, mirror, draft rejection, turtle roundtrip and gallery passed.')
 `,directory],{cwd:root,env:{...process.env,PYTHONPATH:path.join(root,'src')},encoding:'utf8'});
   assert.equal(result.status,0,result.stdout+result.stderr);
@@ -160,17 +198,17 @@ print('Raster-to-grid pipeline: signed trefoil, rotations, mirror, draft rejecti
   assert.equal(path.dirname(fs.realpathSync(directory)),tempRoot,'cleanup stays within the allocated temporary root');
   fs.rmSync(directory,{recursive:true,force:true});
 }
-console.log('Raster tracer: real PNG, grid origins, thresholds, unresolved choices, bounds and invalid inputs passed.');
+console.log('Raster tracer: automatic/manual grids, real PNG, origins, thresholds, unresolved choices, bounds and invalid inputs passed.');
 
 async function testUI() {
-  const elements={};let downloaded;
+  const elements={};let downloaded,rasterImage=referenceRaster();
   class Element {
     constructor(id){this.id=id;this.value=({spacing:'24','origin-x':'0','origin-y':'0',threshold:'160'})[id]??'';
       this.checked=true;this.width=1104;this.height=720;this.listeners={};this.dataset={};}
     addEventListener(name,fn){this.listeners[name]=fn;}
     setAttribute(name,value){this[name]=value;}
     getBoundingClientRect(){return {left:0,top:0,width:this.width,height:this.height};}
-    getContext(){return new Proxy({getImageData:()=>referenceRaster()},{get:(target,key)=>target[key]??(()=>{})});}
+    getContext(){return new Proxy({getImageData:()=>rasterImage},{get:(target,key)=>target[key]??(()=>{})});}
     fire(name,props={}){return this.listeners[name]?.(props);}
     click(){}
   }
@@ -183,31 +221,52 @@ async function testUI() {
   });
   vm.runInContext([...html.matchAll(/<script>([\s\S]*?)<\/script>/g)][1][1],box);
   assert.equal(elements.recognize.disabled,true);
+  assert.equal(elements['auto-recognize'].disabled,true);
   elements.image.files=[{name:'trefoil_reference.png'}];elements.image.fire('change');
   assert.equal(elements.recognize.disabled,false);
-  elements.spacing.value='72';elements.spacing.fire('change');elements.recognize.fire('click');
+  assert.equal(elements['auto-recognize'].disabled,false);
+  elements['auto-recognize'].fire('click');
+  assert.equal(Number(elements.spacing.value),72);
+  assert.equal(Number(elements['origin-x'].value),0);
+  assert.equal(Number(elements['origin-y'].value),0);
   assert.equal(elements.status.dataset.error,'false');
   assert.match(elements.status.textContent,/3 eindeutige.*0 offene/);
   assert.equal(elements.download.disabled,false);
   elements.download.fire('click');
   const saved=JSON.parse(downloaded);
   assert.equal(saved.recognition.inferred_crossings,3);
+  assert.equal(saved.recognition.grid_detection.algorithm,'line-bands-v1');
   assert.equal(saved.source_image,'trefoil_reference.png');
   assert.deepEqual(saved.waypoints,actual.waypoints);
   elements.threshold.value='0';elements.recognize.fire('click');
   assert.equal(elements.status.dataset.error,'true','recognition errors are visible');
   elements.download.fire('click');
   assert.deepEqual(JSON.parse(downloaded).waypoints,saved.waypoints,'failed recognition preserves previous drawing');
+  elements['auto-recognize'].fire('click');
+  assert.equal(elements.status.dataset.error,'true');
+  assert.equal(Number(elements.spacing.value),72,'failed automatic recognition preserves raster settings');
+  elements.download.fire('click');
+  assert.deepEqual(JSON.parse(downloaded),saved,'failed automatic recognition preserves all drawing metadata');
+  elements.threshold.value='160';rasterImage=noise;elements['auto-recognize'].fire('click');
+  assert.equal(elements.status.dataset.error,'true','invalid topology is reported by automatic mode');
+  elements.download.fire('click');assert.deepEqual(JSON.parse(downloaded),saved);
+  rasterImage=referenceRaster();
+  elements.threshold.value='160';elements.recognize.fire('click');
+  elements.download.fire('click');
+  assert.equal(JSON.parse(downloaded).recognition.grid_detection,undefined,'manual raster recognition remains available');
+  elements.spacing.value='71';elements.spacing.fire('change');elements.download.fire('click');
+  assert.equal(JSON.parse(downloaded).recognition,undefined,'manual alignment changes discard inferred raster evidence');
   elements.import.files=[{text:async()=>JSON.stringify(unresolved)}];await elements.import.fire('change');
   assert.equal(elements.download.disabled,true);
   assert.equal(elements.draft.disabled,false);
   assert.equal(elements.recognize.disabled,true,'import clears the old background image');
+  assert.equal(elements['auto-recognize'].disabled,true);
   elements.draft.fire('click');assert.equal(JSON.parse(downloaded).draft,true);
   const found=box.model.intersections(unresolved.waypoints);
   for(const c of found)elements.scene.fire('click',{clientX:c.coordinate[0]*40,clientY:-c.coordinate[1]*40});
   assert.equal(elements.download.disabled,false);
   elements.download.fire('click');assert.equal(JSON.parse(downloaded).crossings.length,3);
   assert.equal(JSON.parse(downloaded).draft,undefined);
-  console.log('Raster UI: image load, recognition, report, failure recovery, draft import/download and manual completion passed.');
+  console.log('Raster UI: automatic/manual recognition, raster controls, report, failure recovery, drafts and manual completion passed.');
 }
 testUI().catch(error=>{console.error(error);process.exitCode=1;});

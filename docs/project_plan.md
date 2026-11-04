@@ -364,10 +364,49 @@ Trefoil `T(2,3)` mit 102 Gitterpunkten und Determinante 3. Die Browserrichtlinie
 blockierte die visuelle Prüfung; sie ist nicht als durchgeführt behauptet.
 Algorithmus, Bildkonventionen und Grenzen: [Rastererkennung](raster_tracer.md).
 
+## Arbeitspaket AP-03: Automatische Rasterbestimmung
+
+Status: **umgesetzt am 04.11.2026**. Der erste offene Schritt nach AP-02 ist
+für saubere rechtwinklige Rasterbilder verfügbar. „Raster und Bild erkennen“
+bestimmt Abstand und Ursprung und übernimmt den Pfad erst nach vollständiger
+Prüfung durch die bestehende Pixel-/Graphpipeline. Die manuelle Ausrichtung
+bleibt als eigener Bedienweg erhalten.
+
+- [x] Horizontale und vertikale Linienbänder aus lokalen Bildpixeln bestimmen;
+  gemeinsame Rasterabstände 8–100 und Ursprünge endlich prüfen.
+- [x] Vorschläge nach Ausrichtungsabweichung und anschließend gröbstem Raster
+  ordnen; höchstens 16 Vorschläge geometrisch und topologisch prüfen.
+- [x] Rasterbedienelemente nur bei erfolgreicher Erkennung übernehmen; bei
+  Fehlern Zeichnung, Kreuzungswahlen und Rastereinstellungen erhalten.
+- [x] Automatische Rasterherkunft im bestehenden JSON-Format, beim
+  Wiederladen und beim Python-/Galerieexport erhalten und validieren.
+- [x] Die vorhandene Trefoil-PNG ohne vorgegebenes Raster bis zum Gitterpfad,
+  exakten Turtle-Code und Offline-Galerie konvertieren; Beispiel neu erzeugen.
+- [x] Rastervarianten, verschobene Ursprünge, fehlende Zwischenlinien,
+  Drehungen/Spiegel, offene Kreuzungswahlen, Fehlerfälle und tatsächliche
+  Editor-Ereignisse prüfen.
+
+Die ursprüngliche Rasterteilung ist bei fehlenden Zwischenlinien nicht eindeutig.
+Die Erkennung liefert den ersten vollständig geprüften Vorschlag nach der
+dokumentierten Reihenfolge, keinen Beweis eines ursprünglichen Zeichenrasters.
+Schmale achsenparallele Linien mit mindestens zwölf Pixeln sichtbarer gerader
+Länge und mindestens zwei getrennten Linienbändern je Achse sind erforderlich.
+Freihandkurven, Entzerrung und gescannte Papierstrukturen sind nicht abgedeckt.
+Algorithmus, Grenzen und Abnahmebefehle: [Rastererkennung](raster_tracer.md).
+
+Abnahme: 97 Python-Tests, beide Node-Editor-/Rasterprüfungen und die vier
+Galerie-Laufzeitprüfungen erfolgreich. Der neu erzeugte Beispieldurchlauf erkennt
+ohne Rastervorgabe Abstand 72, Ursprung 0/0 und einen Trefoil `T(2,3)` mit
+102 Gitterpunkten und drei eindeutigen Kreuzungswahlen. Die Tests prüfen auch
+den exakten Turtle-Roundtrip und die Spiegelunterscheidung. Für die Python-Tests
+wurde in dieser Windows-Sandbox `TEMP`/`TMP` auf `.test_tmp` im Projekt gesetzt.
+Eine manuelle visuelle Browserprüfung ist nicht Teil dieser Abnahme.
+
 ## Nächste Ausbaustufe: allgemeine Bild-Abzeichnung (weiter offen)
 
-AP-02 benötigt einen eingestellten Rasterabstand und Rasterursprung. Für freie
-Kurven und gescannte Vorlagen bleibt die allgemeinere Pipeline offen:
+AP-02 und AP-03 erkennen saubere rechtwinklige Diagramme mit manuell oder
+automatisch ermitteltem Raster. Für freie Kurven und gescannte Vorlagen bleibt
+die allgemeinere Pipeline offen:
 
 ```text
 Bild
@@ -385,7 +424,7 @@ Gitterpfad
 Turtle-Code
 ```
 
-Automatische Rasterbestimmung, allgemeines Skelettieren und die topologisch
-abgesicherte Überführung freier Kurven auf ein rechtwinkliges Raster sind
-weiterhin offen. Die Übereinstimmung der erkannten beziehungsweise manuell
-festgelegten Projektion mit der Bildvorlage muss beim Abzeichnen geprüft werden.
+Allgemeines Skelettieren und die topologisch abgesicherte Überführung freier
+Kurven auf ein rechtwinkliges Raster sind weiterhin offen. Die Übereinstimmung
+der erkannten beziehungsweise manuell festgelegten Projektion mit der Bildvorlage
+muss beim Abzeichnen geprüft werden.

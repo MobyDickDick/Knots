@@ -1,22 +1,24 @@
-# Automatische Rastererkennung (AP-02)
+# Automatische Rastererkennung (AP-02 / AP-03)
 
 Status: **umgesetzt am 03.11.2026** für saubere rechtwinklige Rasterbilder.
 Die Pixelverarbeitung läuft vollständig im vorhandenen Offline-Editor, ohne
-Netzwerkanfragen oder zusätzliche Bibliotheken. Der Benutzer stellt Rasterabstand
-und Ursprung ein und prüft die erkannte Projektion vor dem Speichern.
+Netzwerkanfragen oder zusätzliche Bibliotheken. Seit **AP-03 (04.11.2026)**
+bestimmt der Editor auch Rasterabstand und Ursprung automatisch. Manuelle
+Rasterausrichtung bleibt verfügbar. Die erkannte Projektion vor dem Speichern prüfen.
 
 ## Ablauf
 
 1. `examples/image_tracer.html` im Browser öffnen und ein lokales PNG-, JPEG-
    oder WebP-Bild laden. Das Bild wird proportional auf höchstens 1200 × 900
    Pixel eingepasst. Die Rasterparameter beziehen sich auf diese Anzeigegröße.
-2. Rasterabstand (8–100 Pixel) und Rasterursprung X/Y einstellen, sodass die
+2. „Raster und Bild erkennen“ wählen, um Raster und Pfad gemeinsam zu ermitteln.
+   Alternativ Rasterabstand (8–100 Pixel) und Rasterursprung X/Y einstellen, sodass die
    Mittellinien und Ecken auf dem Raster liegen. Der Ursprung liegt jeweils
    zwischen 0 und Rasterabstand minus 1. Die Dunkel-Schwelle (1–254, Standard
    160) trennt dunkle Linien vom hellen Hintergrund.
-3. „Bild automatisch erkennen“ wählen. Die erkannten Stützpunkte und
+3. Bei manuell eingestelltem Raster „Bild automatisch erkennen“ wählen. Die erkannten Stützpunkte und
    Kreuzungswahlen erscheinen über dem Bild. Ein Fehler lässt die bisherige
-   Zeichnung bestehen. Es gibt keinen automatischen Gitterexport bei einem
+   Zeichnung und Rastereinstellungen bestehen. Es gibt keinen automatischen Gitterexport bei einem
    Erkennungsfehler.
 4. Den gesamten Pfad mit der Vorlage vergleichen. An orangefarbenen Kreuzungen
    fehlt eine eindeutige Über-/Unterangabe: den oberen Strang anklicken.
@@ -30,7 +32,8 @@ und Ursprung ein und prüft die erkannte Projektion vor dem Speichern.
    ```
 
 Für die vorhandene Vorlage `examples/image_trace/trefoil_reference.png`:
-Rasterabstand **72**, Ursprung **0/0**, Dunkel-Schwelle **160**. Die Erkennung
+„Raster und Bild erkennen“ liefert Rasterabstand **72** und Ursprung **0/0**
+bei Dunkel-Schwelle **160**, ohne diese Werte vorzugeben. Die Erkennung
 liefert zehn Ecken und drei vertikale Überführungen. Das Beispiel in
 `examples/raster_trace/` wurde direkt aus diesen PNG-Pixeln erzeugt und ergibt
 einen Trefoil `T(2,3)` mit 102 Gitterpunkten und Determinante 3.
@@ -39,11 +42,49 @@ einen Trefoil `T(2,3)` mit 102 Gitterpunkten und Determinante 3.
 node examples/make_raster_trace.cjs
 ```
 
-Dieses Skript dekodiert nur das bekannte RGB8-Beispiel mit ungefilterten
+Dieses Skript ermittelt das Raster ebenfalls automatisch und dekodiert nur das bekannte RGB8-Beispiel mit ungefilterten
 PNG-Zeilen. Im Editor übernimmt der Browser das allgemeine Dekodieren der
 unterstützten Bildformate. Die Ergebnisgalerie ist
 `examples/raster_trace/index.html`; Annotation und Bild können zur Kontrolle
 auch im Editor geladen werden.
+
+## Automatische Rasterbestimmung (AP-03)
+
+`RasterTracer.recognizeAuto(imageData, {threshold: 160})` liefert dasselbe
+Annotationsformat wie `recognize`, einschließlich offener Kreuzungswahlen.
+Die Funktion verwendet dieselbe Helligkeitsmaske und dieselben Bildgrenzen.
+
+1. Jede Bildzeile und -spalte wird nach zusammenhängenden dunklen Läufen mit
+   mindestens zwölf Pixeln Länge durchsucht. Benachbarte Treffer bilden ein
+   Linienband; dessen gerundete Mitte schlägt eine Linienkoordinate vor.
+   Je Richtung sind mindestens zwei getrennte schmale Bänder nötig.
+2. Für jeden ganzzahligen Abstand von 8 bis 100 Pixeln werden die Ursprünge
+   innerhalb einer Rasterzelle geprüft. Alle Bandmitten müssen höchstens einen
+   Pixel von einer Rasterlinie abweichen. Pro Achse gewinnt der Ursprung mit
+   der kleinsten Summe quadrierter Abweichungen, bei Gleichstand der kleinere.
+3. Rastervorschläge werden nach dieser Gesamtabweichung sortiert, bei
+   Gleichstand nach absteigendem Abstand. Höchstens **16 Raster** durchlaufen
+   anschließend die vollständige vorhandene Graph-, Anschluss-, Fremdpixel-
+   und Komponentenkontrolle. Erst der erste bestandene Vorschlag wird übernommen.
+   Ein Linienband allein begründet weder einen Pfad noch eine Kreuzungswahl.
+
+Ohne sichtbare Zwischenlinien ist der ursprüngliche Zeichenabstand nicht
+eindeutig rekonstruierbar. Die Funktion bevorzugt dann das gröbste bestandene
+Raster mit gleicher Ausrichtungsabweichung: Ein Quadrat mit 120 Pixeln
+Seitenlänge kann beispielsweise auf einem 60-Pixel-Raster erkannt werden,
+auch wenn es ursprünglich auf einem 40-Pixel-Raster gezeichnet wurde.
+Maßgeblich ist die geprüfte Projektion. Nicht jeder theoretisch mögliche
+Rasterursprung wird bis zur Pfadprüfung verfolgt; erschöpfte Vorschläge führen
+zu einer Fehlermeldung und können manuell ausgerichtet werden.
+
+Unterstützt werden schmale, achsenparallele Linien mit ausreichend langen
+sichtbaren geraden Abschnitten und einem gemeinsamen ganzzahligen Raster.
+Abgeschnittene oder verschmolzene Linienbänder, starke Strichbreiten,
+ungleichmäßige Skalierung und schräg eingescannte Vorlagen können scheitern.
+Es gibt keine automatische Bilddrehung, Entzerrung oder Freihanderkennung.
+Bei Fehlern bleiben Zeichnung und Raster unverändert. Bei Erfolg werden Abstand
+und Ursprung sichtbar in die Bedienelemente übernommen; vor dem Speichern
+müssen Pfad und Kreuzungen weiter mit der Vorlage verglichen werden.
 
 ## Pixel, Mittellinie und Graph
 
@@ -100,6 +141,11 @@ Das vorhandene JSON-Format bleibt Version 1. Optional kommen hinzu:
 - `recognition`: Algorithmus `grid-sampling-v1`, Schwelle, Zahl der
   Vordergrundpixel und Rasterkanten sowie anfangs erschlossene/offene Wahlen.
 
+AP-03 ergänzt optional `recognition.grid_detection`: `algorithm: line-bands-v1`,
+`tested_grids` (1–16), `horizontal_lines` und `vertical_lines` (je 2–1200).
+JavaScript und Python prüfen diesen Bericht und erhalten ihn beim JSON-Roundtrip
+und Galerieexport. Alte Berichte ohne dieses Feld bleiben lesbar.
+
 Der Bericht beschreibt den **ersten Erkennungslauf**. Manuelle Kreuzungswahlen
 ändern diese ursprünglichen Zähler nicht. Punktänderungen, Änderungen der
 Rasterausrichtung oder Laden eines anders benannten Bilds entfernen den
@@ -114,8 +160,8 @@ Turtle-Code, Klassifikation und Galerie entspricht dem manuellen Abzeichner.
 
 Unterstützt werden einfarbige dunkle, schmale, rechtwinklige Linien auf hellem
 Grund mit ausreichend getrennten Rasterlinien und lokalen Kreuzungslücken.
-Freihandkurven, gescannte Papierstrukturen, Beschriftungen, automatische
-Rasterbestimmung, beliebige Perspektiven, mehrkomponentige Links und
+Freihandkurven, gescannte Papierstrukturen, Beschriftungen,
+beliebige Perspektiven, mehrkomponentige Links und
 allgemeines Skelettieren bleiben spätere Arbeit. Bei unpassender Vorlage hilft
 der bestehende manuelle Abzeichner. Kleine Bilddetails innerhalb des akzeptierten
 Korridors können unbemerkt bleiben; die Sichtprüfung der Projektion bleibt nötig.
@@ -133,13 +179,18 @@ node tests/test_gallery_runtime.cjs examples/image_trace/index.html
 node tests/test_gallery_runtime.cjs examples/raster_trace/index.html
 ```
 
-Die Rastertests lesen die echte PNG-Vorlage und prüfen zusätzlich unterschiedliche
-Rasterabstände/-ursprünge, Transparenz, Schwellen, Drehungen, Spiegel,
+Die Rastertests lesen die echte PNG-Vorlage mit und ohne Rastervorgabe und prüfen
+zusätzlich unterschiedliche Rasterabstände/-ursprünge, Transparenz, Schwellen, Drehungen, Spiegel,
 unaufgelöste Kreuzungen, offene Pfade, mehrere Komponenten, Fremdpixel,
-ungültige Parameter und Bildgrenzen. Sie führen den erkannten Datensatz durch
+ungültige Parameter und Bildgrenzen. AP-03 ergänzt Abstände 8, 13, 24, 40, 72
+und 100 mit verschiedenen Ursprüngen, gemeinsame Teilraster, fehlende
+Zwischenlinien, ungültige Rasterberichte, automatische Fehlererholung und
+den Erhalt manueller Bedienung. Sie führen den erkannten Datensatz durch
 den Python-Konverter bis zur Galerie, prüfen den exakten Turtle-Roundtrip und
 die Klassifikation einschließlich der Spiegelunterscheidung. Die UI-Tests
 führen die tatsächlichen Ereignisbehandlungen für Bildladen, Erkennung,
 Fehlererholung, Entwurfsimport/-download und manuelle Vervollständigung aus.
-Eine visuelle Browserprüfung wurde durch die lokale Browserrichtlinie blockiert
-und ist nicht Teil der behaupteten Abnahme.
+Abnahme von AP-03 am 04.11.2026: 97 Python-Tests, beide Editor-/Rasterprüfungen
+und alle vier Galerieprüfungen erfolgreich. In der Windows-Sandbox benötigten
+die Python-Tests `TEMP`/`TMP` im beschreibbaren Projektverzeichnis `.test_tmp`.
+Eine manuelle visuelle Browserprüfung ist nicht Teil dieser Abnahme.

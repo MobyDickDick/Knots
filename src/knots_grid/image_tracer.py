@@ -96,7 +96,17 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
                 or any(type(recognition.get(k)) is not int or not 0 <= recognition[k] <= 16_000_000
                        for k in counters)):
             raise ValueError("invalid raster recognition report")
+        grid = recognition.get("grid_detection")
+        if "grid_detection" in recognition:
+            if (not isinstance(grid, dict) or grid.get("algorithm") != "line-bands-v1"
+                    or type(grid.get("tested_grids")) is not int or not 1 <= grid["tested_grids"] <= 16
+                    or any(type(grid.get(k)) is not int or not 2 <= grid[k] <= 1200
+                           for k in ("horizontal_lines", "vertical_lines"))):
+                raise ValueError("invalid automatic grid detection report")
         recognition = {k: recognition[k] for k in ("algorithm", "threshold", *counters)}
+        if grid is not None:
+            recognition["grid_detection"] = {k: grid[k] for k in
+                                            ("algorithm", "tested_grids", "horizontal_lines", "vertical_lines")}
     return DiagramAnnotation(tuple(_coordinate(p, f"waypoint {i}")
                                    for i, p in enumerate(record["waypoints"])), tuple(choices), source, view, recognition, draft)
 

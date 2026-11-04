@@ -89,7 +89,13 @@
       "foreground_pixels": 11371,
       "grid_edges": 24,
       "inferred_crossings": 3,
-      "unresolved_crossings": 0
+      "unresolved_crossings": 0,
+      "grid_detection": {
+        "algorithm": "line-bands-v1",
+        "tested_grids": 1,
+        "horizontal_lines": 5,
+        "vertical_lines": 5
+      }
     }
   },
   "turtle_code": "000000000000200000002000000010030030002000000020000000000020000000000020030030002000000020000003003000",

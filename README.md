@@ -80,15 +80,17 @@ und anschließend `trefoil_reference.png` in den Editor laden oder die fertige
 `index.html` öffnen. `python examples/make_image_trace.py` erzeugt das Beispiel
 erneut. Die Übereinstimmung mit der Bildvorlage hängt von den manuell gesetzten
 Stützpunkten und Kreuzungswahlen ab. Für saubere rechtwinklige Rasterbilder ist
-auch automatische Erkennung verfügbar: Rasterabstand und Ursprung einstellen,
-„Bild automatisch erkennen“ wählen und das Ergebnis prüfen. Eindeutige
+auch automatische Erkennung verfügbar: „Raster und Bild erkennen“ bestimmt
+Rasterabstand und Ursprung und übernimmt den geprüften Pfad. Alternativ das
+Raster selbst einstellen und „Bild automatisch erkennen“ wählen. Eindeutige
 Kreuzungslücken liefern Über-/Unterwahlen; offene Wahlen bleiben als Entwurf
 speicherbar und müssen vor dem Gitterexport ergänzt werden.
 
 `examples/raster_trace/index.html` zeigt einen direkt aus der vorhandenen PNG
 erkannten Trefoil. `node examples/make_raster_trace.cjs` erzeugt den Durchlauf
-ohne zusätzliche Pakete erneut. Freihandkurven und automatische Rasterbestimmung
-bleiben offen. Format und Bedienung stehen in [docs/image_tracer.md](docs/image_tracer.md),
+ohne zusätzliche Pakete und ohne Rastervorgabe erneut. Die automatische
+Rasterbestimmung (AP-03) ist für saubere rechtwinklige Linien umgesetzt;
+Freihandkurven bleiben offen. Format und Bedienung stehen in [docs/image_tracer.md](docs/image_tracer.md),
 Algorithmus, unterstützte Bilder und Grenzen in [docs/raster_tracer.md](docs/raster_tracer.md).
 
 # Knots

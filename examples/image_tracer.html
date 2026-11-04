@@ -33,6 +33,7 @@ Prüfe danach den Pfad und die Über-/Unterführung an jeder Kreuzung. Die gespe
 </div>
 <div class="tools">
 <label>Dunkel-Schwelle <input id="threshold" type="number" min="1" max="254" value="160"></label>
+<button id="auto-recognize" disabled>Raster und Bild erkennen</button>
 <button id="recognize" disabled>Bild automatisch erkennen</button>
 <button id="draft" disabled>Entwurf speichern</button>
 </div>
@@ -51,7 +52,7 @@ Prüfe danach den Pfad und die Über-/Unterführung an jeder Kreuzung. Die gespe
 <details open><summary>So funktioniert es</summary>
 <ol>
 <li>Optional eine Bildvorlage laden. Sie bleibt auf deinem Computer. Das Bild wird proportional auf die Zeichenfläche eingepasst.</li>
-<li>Für ein sauberes rechtwinkliges Rasterbild: Rasterabstand und Rasterursprung so einstellen, dass die Linien auf dem Raster liegen, dann „Bild automatisch erkennen“ wählen. Dunkle Linien auf hellem Grund werden lokal ausgewertet. Das Ergebnis mit der Vorlage vergleichen; orange Kreuzungen brauchen eine manuelle Wahl. „Entwurf speichern“ erhält auch offene Wahlen.</li>
+<li>Für ein sauberes rechtwinkliges Rasterbild: „Raster und Bild erkennen“ bestimmt Abstand und Ursprung und zeichnet den Pfad nach. Alternativ das Raster selbst einstellen und „Bild automatisch erkennen“ wählen. Dunkle Linien auf hellem Grund werden lokal ausgewertet. Das Ergebnis mit der Vorlage vergleichen; orange Kreuzungen brauchen eine manuelle Wahl. „Entwurf speichern“ erhält auch offene Wahlen.</li>
 <li>Raster einstellen und die Linie einmal der Reihe nach abklicken. Der nächste Punkt rastet horizontal oder vertikal zum vorherigen ein. Zusätzliche Ecken helfen beim Nachzeichnen runder Bögen. Den Startpunkt nicht nochmals setzen.</li>
 <li>Mit „Linie schließen“ die letzte Strecke zum Start ergänzen. Auch diese muss waagerecht oder senkrecht sein. Bei einer Fehlermeldung den letzten Punkt zurücknehmen und korrigieren.</li>
 <li>Im Modus „Kreuzungen“ auf jeden orangefarbenen Kreis klicken. Ein weiterer Klick wechselt den oberen Strang. Alle Kreuzungen müssen grün sein.</li>
@@ -151,6 +152,12 @@ const TracerModel = (() => {
         if(r.algorithm!=='grid-sampling-v1'||!integer(r.threshold)||r.threshold<1||r.threshold>254
           ||!['foreground_pixels','grid_edges','inferred_crossings','unresolved_crossings'].every(k=>integer(r[k])&&r[k]>=0&&r[k]<=16000000))throw Error('Ungültiger Erkennungsbericht.');
         drawing.recognition={algorithm:r.algorithm,threshold:r.threshold,...Object.fromEntries(['foreground_pixels','grid_edges','inferred_crossings','unresolved_crossings'].map(k=>[k,r[k]]))};
+        if(r.grid_detection!==undefined){
+          const g=r.grid_detection;
+          if(!g||g.algorithm!=='line-bands-v1'||!integer(g.tested_grids)||g.tested_grids<1||g.tested_grids>16
+            ||!['horizontal_lines','vertical_lines'].every(k=>integer(g[k])&&g[k]>=2&&g[k]<=1200))throw Error('Ungültiger Raster-Erkennungsbericht.');
+          drawing.recognition.grid_detection={algorithm:g.algorithm,tested_grids:g.tested_grids,horizontal_lines:g.horizontal_lines,vertical_lines:g.vertical_lines};
+        }
       }
       record.crossings.forEach(c=>{
         if(!c||!Array.isArray(c.coordinate)||c.coordinate.length!==2||!c.coordinate.every(integer)||!integer(c.over_segment)) throw Error('Ungültige Kreuzungswahl.');
@@ -166,12 +173,11 @@ const TracerModel = (() => {
 
 // Grid-constrained centreline extraction. No network, libraries or guessed crossings.
 const RasterTracer = (() => {
-  function recognize({data,width,height}, {spacing=24,origin=[0,0],threshold=160}={}) {
+  function pixels({data,width,height},threshold) {
     const integer=Number.isSafeInteger;
     if(!integer(width)||!integer(height)||width<1||height<1||width>1200||height>900||!data||data.length!==width*height*4)
       throw Error('Erkennung unterstützt höchstens 1200 × 900 Pixel.');
-    if(!integer(spacing)||spacing<8||spacing>100||!Array.isArray(origin)||origin.length!==2||!origin.every(v=>integer(v)&&v>=0&&v<spacing)
-      ||!integer(threshold)||threshold<1||threshold>254)throw Error('Rasterabstand, Ursprung oder Dunkel-Schwelle ungültig.');
+    if(!integer(threshold)||threshold<1||threshold>254)throw Error('Dunkel-Schwelle ungültig.');
     const mask=new Uint8Array(width*height);let foreground=0;
     for(let i=0;i<mask.length;i++) {
       const k=4*i, alpha=data[k+3]/255;
@@ -179,6 +185,16 @@ const RasterTracer = (() => {
       if(light<threshold){mask[i]=1;foreground++;}
     }
     if(!foreground)throw Error('Keine dunkle Linie gefunden. Dunkel-Schwelle prüfen.');
+    return {mask,foreground};
+  }
+  function recognize(image, {spacing=24,origin=[0,0],threshold=160}={}) {
+    const {mask,foreground}=pixels(image,threshold);
+    return recognizeGrid(image,{spacing,origin,threshold},mask,foreground);
+  }
+  function recognizeGrid({width,height}, {spacing,origin,threshold}, mask,foreground) {
+    const integer=Number.isSafeInteger;
+    if(!integer(spacing)||spacing<8||spacing>100||!Array.isArray(origin)||origin.length!==2||!origin.every(v=>integer(v)&&v>=0&&v<spacing))
+      throw Error('Rasterabstand oder Ursprung ungültig.');
     const cols=Math.floor((width-1-origin[0])/spacing)+1, rows=Math.floor((height-1-origin[1])/spacing)+1;
     const adjacency=new Map(), edges=[], radius=Math.max(1,Math.floor(spacing*.12));
     const xy=id=>[origin[0]+(id%cols)*spacing,origin[1]+Math.floor(id/cols)*spacing];
@@ -262,7 +278,56 @@ const RasterTracer = (() => {
       recognition:{algorithm:'grid-sampling-v1',threshold,foreground_pixels:foreground,grid_edges:edges.length,
         inferred_crossings:crossings.length,unresolved_crossings:unresolved}};
   }
-  return {recognize};
+  // Infer line centres from bands of long horizontal / vertical ink runs.
+  // Candidate grids are proposals only: the complete graph validator must accept.
+  function recognizeAuto(image,{threshold=160}={}) {
+    const {mask,foreground}=pixels(image,threshold),{width,height}=image;
+    function centres(horizontal) {
+      const count=horizontal?height:width, length=horizontal?width:height, bands=[];
+      let start=-1;
+      for(let axis=0;axis<=count;axis++) {
+        let longest=0,run=0;
+        if(axis<count)for(let t=0;t<length;t++) {
+          run=mask[horizontal?axis*width+t:t*width+axis]?run+1:0;
+          longest=Math.max(longest,run);
+        }
+        if(longest>=12){if(start<0)start=axis;}
+        else if(start>=0){bands.push(Math.round((start+axis-1)/2));start=-1;}
+      }
+      return bands;
+    }
+    const xs=centres(false),ys=centres(true);
+    if(xs.length<2||ys.length<2)throw Error('Raster nicht bestimmbar: mindestens zwei schmale Linienbänder je Richtung mit 12 Pixeln sichtbarer Länge nötig. Raster manuell einstellen.');
+    function fit(lines,spacing) {
+      let best=null;
+      for(let origin=0;origin<spacing;origin++) {
+        let error=0;
+        for(const line of lines) {
+          const residual=((line-origin)%spacing+spacing)%spacing, distance=Math.min(residual,spacing-residual);
+          if(distance>1){error=Infinity;break;}error+=distance*distance;
+        }
+        if(!best||error<best.error)best={origin,error};
+      }
+      return best;
+    }
+    const candidates=[];
+    for(let spacing=8;spacing<=100;spacing++) {
+      const x=fit(xs,spacing),y=fit(ys,spacing),error=x.error+y.error;
+      if(Number.isFinite(error))candidates.push({spacing,origin:[x.origin,y.origin],error});
+    }
+    candidates.sort((a,b)=>a.error-b.error||b.spacing-a.spacing);
+    let tested=0,lastError='Kein gemeinsames Raster zwischen 8 und 100 Pixeln.';
+    for(const candidate of candidates.slice(0,16)) {
+      tested++;
+      try {
+        const record=recognizeGrid(image,{...candidate,threshold},mask,foreground);
+        record.recognition.grid_detection={algorithm:'line-bands-v1',tested_grids:tested,horizontal_lines:ys.length,vertical_lines:xs.length};
+        return record;
+      }catch(error){lastError=error.message;}
+    }
+    throw Error(`Kein geprüftes Raster gefunden (${tested}/16 Versuche). ${lastError} Raster manuell einstellen oder Vorlage manuell abzeichnen.`);
+  }
+  return {recognize,recognizeAuto};
 })();
 </script>
 <script>
@@ -301,7 +366,7 @@ const RasterTracer = (() => {
     }
     let valid=false;try{drawing.record();valid=true;}catch{}
     get('download').disabled=!valid;get('undo').disabled=!pts.length;get('close').disabled=drawing.closed;
-    get('draft').disabled=!drawing.closed;get('recognize').disabled=!image;
+    get('draft').disabled=!drawing.closed;get('recognize').disabled=!image;get('auto-recognize').disabled=!image;
     get('point-mode').setAttribute('aria-pressed',String(mode==='points'));
     get('crossing-mode').setAttribute('aria-pressed',String(mode==='crossings'));
   }
@@ -330,7 +395,7 @@ const RasterTracer = (() => {
     candidate.onload=()=>{if(request!==imageRequest){URL.revokeObjectURL(url);return;}if(imageUrl)URL.revokeObjectURL(imageUrl);
       imageUrl=url;image=candidate;if(drawing.source!==file.name)drawing.recognition=null;drawing.source=file.name;
       const factor=Math.min(1,1200/image.naturalWidth,900/image.naturalHeight);
-      canvas.width=drawing.view?.width??Math.round(image.naturalWidth*factor);canvas.height=drawing.view?.height??Math.round(image.naturalHeight*factor);render();message('Bild geladen. Raster einstellen und automatisch erkennen oder Stützpunkte setzen.');};
+      canvas.width=drawing.view?.width??Math.round(image.naturalWidth*factor);canvas.height=drawing.view?.height??Math.round(image.naturalHeight*factor);render();message('Bild geladen. „Raster und Bild erkennen“ wählen, Raster selbst einstellen oder Stützpunkte setzen.');};
     candidate.onerror=()=>{URL.revokeObjectURL(url);message('Bild konnte nicht geladen werden.',true);};candidate.src=url;
   });
   get('import').addEventListener('change',async()=>{
@@ -348,18 +413,22 @@ const RasterTracer = (() => {
       status();render();
     }catch(error){message(error.message,true);}get('import').value='';
   });
-  get('recognize').addEventListener('click',()=>{
+  function recognizeImage(automatic){
     try{
       if(!image)throw Error('Bitte zuerst eine Bildvorlage laden.');
       // Read a clean canvas, never the grid, annotations or faded display layer.
       const raw=document.createElement('canvas');raw.width=canvas.width;raw.height=canvas.height;
       const context=raw.getContext('2d');context.drawImage(image,0,0,raw.width,raw.height);
-      const record=RasterTracer.recognize(context.getImageData(0,0,raw.width,raw.height),{spacing:spacing(),origin:origin(),threshold:Number(get('threshold').value)});
+      const pixels=context.getImageData(0,0,raw.width,raw.height),threshold=Number(get('threshold').value);
+      const record=automatic?RasterTracer.recognizeAuto(pixels,{threshold}):RasterTracer.recognize(pixels,{spacing:spacing(),origin:origin(),threshold});
       record.source_image=drawing.source;
       const candidate=TracerModel.Drawing.load(record);drawing=candidate;offset=[0,0];mode='crossings';
-      render();message(`Erkannt: ${drawing.points.length} Stützpunkte, ${drawing.choices.size} eindeutige Kreuzungswahlen, ${drawing.recognition.unresolved_crossings} offene Wahlen. Ergebnis mit der Vorlage vergleichen und offene Kreuzungen wählen.`);
+      get('spacing').value=record.editor_view.spacing;get('origin-x').value=record.editor_view.pixel_origin[0];get('origin-y').value=record.editor_view.pixel_origin[1];
+      render();message(`${automatic?`Raster: ${spacing()} Pixel, Ursprung ${origin().join('/')}. `:''}Erkannt: ${drawing.points.length} Stützpunkte, ${drawing.choices.size} eindeutige Kreuzungswahlen, ${drawing.recognition.unresolved_crossings} offene Wahlen. Ergebnis mit der Vorlage vergleichen und offene Kreuzungen wählen.`);
     }catch(error){message(error.message,true);}
-  });
+  }
+  get('recognize').addEventListener('click',()=>recognizeImage(false));
+  get('auto-recognize').addEventListener('click',()=>recognizeImage(true));
   function download(allowDraft){action(()=>{
     drawing.view={spacing:spacing(),width:canvas.width,height:canvas.height,offset:[...offset],...(origin().some(v=>v!==0)?{pixel_origin:origin()}:{})};
     const record=drawing.record(allowDraft);

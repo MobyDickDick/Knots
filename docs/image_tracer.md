@@ -7,7 +7,8 @@ Es gibt weder Server noch externe Bibliotheken oder Netzwerkanfragen.
 Die Bilddatei bleibt separat und wird nicht in die Annotation eingebettet.
 
 Seit AP-02 kann der Editor saubere rechtwinklige Rasterbilder auch direkt aus
-den Pixeln erkennen. Rasterabstand und Pixelursprung werden eingestellt;
+den Pixeln erkennen. Seit AP-03 bestimmt „Raster und Bild erkennen“ auch
+Rasterabstand und Pixelursprung automatisch; beide bleiben manuell einstellbar.
 Kreuzungslücken werden ausgewertet und unklare Wahlen bleiben offen. Details:
 [Automatische Rastererkennung](raster_tracer.md). Der folgende manuelle Ablauf
 bleibt verfügbar.
@@ -80,7 +81,9 @@ Optionales `editor_view` enthält `spacing`, `offset`, `width` und `height` für
 die Bildausrichtung; zusätzlich kann `pixel_origin: [x, y]` zwei ganze
 Pixelversätze innerhalb einer Rasterzelle speichern. Die Gitterkonvertierung
 hängt davon nicht ab. Automatisch erzeugte Annotationen enthalten außerdem
-einen `recognition`-Bericht, der beim Python-Export erhalten bleibt.
+einen `recognition`-Bericht, der beim Python-Export erhalten bleibt. Bei
+automatischer Rasterbestimmung enthält er zusätzlich `grid_detection` mit
+Algorithmus, Anzahl geprüfter Raster sowie horizontaler und vertikaler Linienbänder.
 
 Ein mit `draft: true` gekennzeichneter Entwurf darf fehlende Kreuzungswahlen
 enthalten und lässt sich im Editor weiterbearbeiten. Der Python-Konverter
