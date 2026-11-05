@@ -402,11 +402,53 @@ den exakten Turtle-Roundtrip und die Spiegelunterscheidung. Für die Python-Test
 wurde in dieser Windows-Sandbox `TEMP`/`TMP` auf `.test_tmp` im Projekt gesetzt.
 Eine manuelle visuelle Browserprüfung ist nicht Teil dieser Abnahme.
 
-## Nächste Ausbaustufe: allgemeine Bild-Abzeichnung (weiter offen)
+## Arbeitspaket AP-04: Saubere freie Kurven abzeichnen
+
+Status: **umgesetzt am 05.11.2026**. Der nächste Schritt der allgemeinen
+Bild-Abzeichnung ist als begrenzte Offline-Pipeline für saubere durchgezogene
+Kurven verfügbar. Eine allgemeine Aufbereitung beliebiger Scans ist damit
+weiterhin nicht abgeschlossen.
+
+- [x] Dunkle Pixel isolieren und ohne stillschweigende Fremdpixelentfernung
+  skelettieren; Komponenten und Euler-Charakteristik prüfen.
+- [x] Grad-2-Ketten und lochfreie Kreuzungsregionen mit vier geordneten Armen
+  rekonstruieren; offene, verzweigte und nicht unterstützte Fälle ablehnen.
+- [x] Den fein aufgelösten und den gerasterten eingebetteten Graphen anhand
+  von Kreuzungen, zyklischer Armreihenfolge und Kettenverbindungen vergleichen.
+- [x] Rechtwinklige Gitterwege mit begrenzter lokaler Routensuche erzeugen;
+  Kontakte außerhalb der geplanten Kreuzungen ausschließen und genau einen
+  geschlossenen Strang sowie die exakten Segmentkreuzungen prüfen.
+- [x] „Freie Kurve erkennen“ in den vorhandenen Editor integrieren;
+  Über-/Unterwahlen manuell ergänzen, Entwürfe speichern/laden und bei Fehlern
+  Zeichnung und Raster erhalten.
+- [x] Kurvenherkunft und feine Zeichenraster im JSON-/Python-Roundtrip erhalten
+  und Galerie, Gitterpfad sowie exakten Turtle-Code über die bestehende Pipeline
+  exportieren.
+- [x] Echtes PNG-Beispiel mit Kontrollüberlagerung und ergänzter Annotation
+  bereitstellen: `node examples/make_curve_trace.cjs`, `examples/curve_trace/`.
+- [x] Kurven, Drehungen, Spiegelungen, Fehlerfälle, Grenzen, Editor-Ereignisse,
+  Klassifikation, Turtle-Roundtrip und Galerie automatisiert prüfen.
+
+Die freie Kurvenerkennung schlägt bewusst keine Über-/Unterwahlen aus
+durchgezogenen Kreuzungen vor. Das runde Trefoil-Beispiel besitzt 144
+Stützpunkte und drei offene Kreuzungswahlen; nach deren expliziter Ergänzung
+entstehen ein `T(2,3)` mit Determinante 3 und 3702 Gitterpunkte. Die
+Kontrollüberlagerung wurde visuell geprüft. Algorithmus, topologische Prüfungen,
+unterstützte Bilder und Abnahmebefehle: [Freie Kurven erkennen](curve_tracer.md).
+
+Abnahme: 98 Python-Tests, die drei Node-Editor-/Erkennungsprüfungen und alle
+fünf Galerie-Laufzeitprüfungen erfolgreich. Die Kurvenprüfung deckt auch den
+Rückfall auf ein feineres Raster mit einem Pixel Zeichenabstand ab. Die
+Python-/Node-Tests verwenden in der Windows-Sandbox `TEMP`/`TMP` im
+Projektverzeichnis `.test_tmp`. Eine manuelle Browserprüfung ist nicht Teil
+dieser Abnahme.
+
+## Nächste Ausbaustufe: gescannte Vorlagen (weiter offen)
 
 AP-02 und AP-03 erkennen saubere rechtwinklige Diagramme mit manuell oder
-automatisch ermitteltem Raster. Für freie Kurven und gescannte Vorlagen bleibt
-die allgemeinere Pipeline offen:
+automatisch ermitteltem Raster. AP-04 ergänzt saubere freie Kurven mit
+durchgezogenen Kreuzungen. Für gescannte Vorlagen bleibt die allgemeinere
+Bildaufbereitung offen:
 
 ```text
 Bild
@@ -424,7 +466,7 @@ Gitterpfad
 Turtle-Code
 ```
 
-Allgemeines Skelettieren und die topologisch abgesicherte Überführung freier
-Kurven auf ein rechtwinkliges Raster sind weiterhin offen. Die Übereinstimmung
+Papierstrukturen, Beleuchtung, Beschriftungen, unterbrochene freie Kurven und
+deren Kreuzungslücken sowie Entzerrung sind weiterhin offen. Die Übereinstimmung
 der erkannten beziehungsweise manuell festgelegten Projektion mit der Bildvorlage
 muss beim Abzeichnen geprüft werden.

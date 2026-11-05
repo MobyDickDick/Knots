@@ -89,8 +89,15 @@ speicherbar und müssen vor dem Gitterexport ergänzt werden.
 `examples/raster_trace/index.html` zeigt einen direkt aus der vorhandenen PNG
 erkannten Trefoil. `node examples/make_raster_trace.cjs` erzeugt den Durchlauf
 ohne zusätzliche Pakete und ohne Rastervorgabe erneut. Die automatische
-Rasterbestimmung (AP-03) ist für saubere rechtwinklige Linien umgesetzt;
-Freihandkurven bleiben offen. Format und Bedienung stehen in [docs/image_tracer.md](docs/image_tracer.md),
+Rasterbestimmung (AP-03) ist für saubere rechtwinklige Linien umgesetzt.
+„Freie Kurve erkennen“ (AP-04) skelettiert jetzt auch saubere durchgezogene
+Kurven ohne vorgegebenes Raster; die Über-/Unterwahl erfolgt dabei manuell.
+`node examples/make_curve_trace.cjs` erzeugt das runde Trefoil-Beispiel mit
+Entwurf, ergänzter Annotation, Kontrollüberlagerung und Galerie in
+`examples/curve_trace/`. Gescannte Papierstrukturen und Kreuzungslücken bei
+freien Kurven bleiben offen. Verfahren und Grenzen:
+[docs/curve_tracer.md](docs/curve_tracer.md).
+Format und Bedienung stehen in [docs/image_tracer.md](docs/image_tracer.md),
 Algorithmus, unterstützte Bilder und Grenzen in [docs/raster_tracer.md](docs/raster_tracer.md).
 
 # Knots

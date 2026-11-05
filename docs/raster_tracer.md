@@ -194,3 +194,7 @@ Abnahme von AP-03 am 04.11.2026: 97 Python-Tests, beide Editor-/Rasterprüfungen
 und alle vier Galerieprüfungen erfolgreich. In der Windows-Sandbox benötigten
 die Python-Tests `TEMP`/`TMP` im beschreibbaren Projektverzeichnis `.test_tmp`.
 Eine manuelle visuelle Browserprüfung ist nicht Teil dieser Abnahme.
+
+AP-04 ergänzt einen separaten Bedienweg für saubere durchgezogene freie Kurven
+mit Skelettierung und geprüfter Graphüberführung. Die Rasterpipeline dieses
+Dokuments bleibt unverändert: [Freie Kurven erkennen](curve_tracer.md).

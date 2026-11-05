@@ -79,7 +79,7 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
         if any(type(view.get(key)) is not int for key in keys):
             raise ValueError("editor_view needs integer spacing, width and height")
         offset = _coordinate(view.get("offset"), "editor_view offset")
-        if (not 8 <= view["spacing"] <= 100 or not 1 <= view["width"] <= 12000
+        if (not 1 <= view["spacing"] <= 100 or not 1 <= view["width"] <= 12000
                 or not 1 <= view["height"] <= 12000 or view["width"] * view["height"] > 16_000_000):
             raise ValueError("editor_view dimensions are outside the supported limits")
         view = {**{key: view[key] for key in keys}, "offset": list(offset)}
@@ -91,11 +91,19 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
     recognition = record.get("recognition")
     if recognition is not None:
         counters = ("foreground_pixels", "grid_edges", "inferred_crossings", "unresolved_crossings")
-        if (not isinstance(recognition, dict) or recognition.get("algorithm") != "grid-sampling-v1"
+        if (not isinstance(recognition, dict) or recognition.get("algorithm") not in ("grid-sampling-v1", "skeleton-orthogonal-v1")
                 or type(recognition.get("threshold")) is not int or not 1 <= recognition["threshold"] <= 254
                 or any(type(recognition.get(k)) is not int or not 0 <= recognition[k] <= 16_000_000
                        for k in counters)):
             raise ValueError("invalid raster recognition report")
+        curve = recognition["algorithm"] == "skeleton-orthogonal-v1"
+        curve_keys = ("sample_size", "skeleton_pixels", "thinning_iterations")
+        if curve:
+            if (type(recognition.get("sample_size")) is not int or recognition["sample_size"] not in (4, 8, 12)
+                    or type(recognition.get("skeleton_pixels")) is not int or not 4 <= recognition["skeleton_pixels"] <= 100_000
+                    or type(recognition.get("thinning_iterations")) is not int or not 1 <= recognition["thinning_iterations"] <= 128
+                    or recognition["inferred_crossings"] != 0 or "grid_detection" in recognition):
+                raise ValueError("invalid curve recognition report")
         grid = recognition.get("grid_detection")
         if "grid_detection" in recognition:
             if (not isinstance(grid, dict) or grid.get("algorithm") != "line-bands-v1"
@@ -103,7 +111,7 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
                     or any(type(grid.get(k)) is not int or not 2 <= grid[k] <= 1200
                            for k in ("horizontal_lines", "vertical_lines"))):
                 raise ValueError("invalid automatic grid detection report")
-        recognition = {k: recognition[k] for k in ("algorithm", "threshold", *counters)}
+        recognition = {k: recognition[k] for k in ("algorithm", "threshold", *counters, *(curve_keys if curve else ()))}
         if grid is not None:
             recognition["grid_detection"] = {k: grid[k] for k in
                                             ("algorithm", "tested_grids", "horizontal_lines", "vertical_lines")}
@@ -260,7 +268,11 @@ def write_traced_diagram(annotation: DiagramAnnotation, directory: str | Path,
 
     trace = trace_annotation(annotation, max_vertices=max_vertices)
     classification = classify_knot(trace.points)
-    metadata = {"source": "reviewed_raster_annotation" if annotation.recognition else "manual_image_annotation", "refinement": REFINEMENT,
+    source = "manual_image_annotation"
+    if annotation.recognition:
+        source = ("reviewed_curve_annotation" if annotation.recognition["algorithm"] == "skeleton-orthogonal-v1"
+                  else "reviewed_raster_annotation")
+    metadata = {"source": source, "refinement": REFINEMENT,
                 "annotation": annotation_to_dict(annotation), "turtle_code": trace.code,
                 "classification": asdict(classification), "global_minimality_claimed": False}
     target = Path(directory)

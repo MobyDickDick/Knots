@@ -192,6 +192,31 @@ class ImageTracerTests(unittest.TestCase):
                 write_traced_diagram(annotation_from_dict(record), target)
             self.assertFalse(target.exists())
 
+    def test_curve_recognition_report_and_fine_editor_grid(self):
+        record = annotation_to_dict(annotate_grid_candidate(trefoil_candidate()))
+        report = {"algorithm": "skeleton-orthogonal-v1", "threshold": 160,
+                  "foreground_pixels": 12000, "grid_edges": 900, "inferred_crossings": 0,
+                  "unresolved_crossings": 3, "sample_size": 12, "skeleton_pixels": 2100,
+                  "thinning_iterations": 5}
+        record["recognition"] = report
+        for spacing in (1, 2, 3):
+            record["editor_view"] = {"spacing": spacing, "offset": [0, 0], "width": 560,
+                                     "height": 560, "pixel_origin": [0, 0]}
+            self.assertEqual(annotation_to_dict(annotation_from_dict(record)), record)
+        with TemporaryDirectory() as directory:
+            result = json.loads(write_traced_diagram(annotation_from_dict(record), directory).read_text())
+            self.assertEqual(result["source"], "reviewed_curve_annotation")
+            self.assertEqual(result["annotation"], record)
+        for patch in ({"sample_size": True}, {"sample_size": 3}, {"skeleton_pixels": 0},
+                      {"skeleton_pixels": 100001}, {"thinning_iterations": 0},
+                      {"thinning_iterations": 129}, {"thinning_iterations": True},
+                      {"inferred_crossings": 1}, {"grid_detection": None}):
+            with self.subTest(patch=patch), self.assertRaises(ValueError):
+                annotation_from_dict({**record, "recognition": {**report, **patch}})
+        for spacing in (0, -1, 1.5, True, 101):
+            with self.subTest(spacing=spacing), self.assertRaises(ValueError):
+                annotation_from_dict({**record, "editor_view": {**record["editor_view"], "spacing": spacing}})
+
     def test_vertex_budget_precedes_expansion_and_counts_layer_switches(self):
         annotation = annotate_grid_candidate(trefoil_candidate())
         size = len(trace_annotation(annotation).points) - 1

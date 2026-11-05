@@ -19,13 +19,13 @@ details{margin-top:18px}summary{cursor:pointer}a{color:#164f73}ol{line-height:1.
 </style>
 <main>
 <h1>Knoten abzeichnen</h1>
-<p class="intro">Erkenne ein rechtwinkliges Rasterbild automatisch oder zeichne seine Linie nach.
+<p class="intro">Erkenne ein Rasterbild oder eine saubere freie Kurve automatisch oder zeichne ihre Linie nach.
 Prüfe danach den Pfad und die Über-/Unterführung an jeder Kreuzung. Die gespeicherte Zeichnung lässt sich in einen geprüften Gitterknoten umwandeln.</p>
 <noscript>Für den Abzeichner muss JavaScript aktiviert sein.</noscript>
 <div class="panel">
 <div class="tools">
 <label>Bildvorlage <input id="image" type="file" accept="image/png,image/jpeg,image/webp"></label>
-<label>Raster in Pixeln <input id="spacing" type="number" min="8" max="100" value="24"></label>
+<label>Raster in Pixeln <input id="spacing" type="number" min="1" max="100" value="24"></label>
 <label>Rasterursprung X <input id="origin-x" type="number" min="0" max="99" value="0"></label>
 <label>Y <input id="origin-y" type="number" min="0" max="99" value="0"></label>
 <label><input id="show-image" type="checkbox" checked> Bild anzeigen</label>
@@ -35,6 +35,7 @@ Prüfe danach den Pfad und die Über-/Unterführung an jeder Kreuzung. Die gespe
 <label>Dunkel-Schwelle <input id="threshold" type="number" min="1" max="254" value="160"></label>
 <button id="auto-recognize" disabled>Raster und Bild erkennen</button>
 <button id="recognize" disabled>Bild automatisch erkennen</button>
+<button id="curve-recognize" disabled>Freie Kurve erkennen</button>
 <button id="draft" disabled>Entwurf speichern</button>
 </div>
 <div class="tools">
@@ -53,6 +54,7 @@ Prüfe danach den Pfad und die Über-/Unterführung an jeder Kreuzung. Die gespe
 <ol>
 <li>Optional eine Bildvorlage laden. Sie bleibt auf deinem Computer. Das Bild wird proportional auf die Zeichenfläche eingepasst.</li>
 <li>Für ein sauberes rechtwinkliges Rasterbild: „Raster und Bild erkennen“ bestimmt Abstand und Ursprung und zeichnet den Pfad nach. Alternativ das Raster selbst einstellen und „Bild automatisch erkennen“ wählen. Dunkle Linien auf hellem Grund werden lokal ausgewertet. Das Ergebnis mit der Vorlage vergleichen; orange Kreuzungen brauchen eine manuelle Wahl. „Entwurf speichern“ erhält auch offene Wahlen.</li>
+<li>Für eine freie Kurve: „Freie Kurve erkennen“ skelettiert eine durchgezogene dunkle Linie und überführt ihren geprüften Graphen auf ein feines rechtwinkliges Raster. Alle Über-/Unterführungen anschließend manuell wählen. Kreuzungslücken, Berührungen, Beschriftungen und Papierstrukturen sind in diesem Modus nicht unterstützt.</li>
 <li>Raster einstellen und die Linie einmal der Reihe nach abklicken. Der nächste Punkt rastet horizontal oder vertikal zum vorherigen ein. Zusätzliche Ecken helfen beim Nachzeichnen runder Bögen. Den Startpunkt nicht nochmals setzen.</li>
 <li>Mit „Linie schließen“ die letzte Strecke zum Start ergänzen. Auch diese muss waagerecht oder senkrecht sein. Bei einer Fehlermeldung den letzten Punkt zurücknehmen und korrigieren.</li>
 <li>Im Modus „Kreuzungen“ auf jeden orangefarbenen Kreis klicken. Ein weiterer Klick wechselt den oberen Strang. Alle Kreuzungen müssen grün sein.</li>
@@ -140,7 +142,7 @@ const TracerModel = (() => {
       const view=record.editor_view;
       if(view!=null){
         if(![view.spacing,view.width,view.height].every(integer)||!Array.isArray(view.offset)||view.offset.length!==2||!view.offset.every(integer)
-          ||view.spacing<8||view.spacing>100||view.width<1||view.width>12000||view.height<1||view.height>12000||view.width*view.height>16000000)throw Error('Ungültige Zeichenflächen-Einstellungen.');
+          ||view.spacing<1||view.spacing>100||view.width<1||view.width>12000||view.height<1||view.height>12000||view.width*view.height>16000000)throw Error('Ungültige Zeichenflächen-Einstellungen.');
         drawing.view={spacing:view.spacing,width:view.width,height:view.height,offset:[...view.offset]};
         if(view.pixel_origin!=null){
           if(!Array.isArray(view.pixel_origin)||view.pixel_origin.length!==2||!view.pixel_origin.every(v=>integer(v)&&v>=0&&v<view.spacing))throw Error('Ungültiger Rasterursprung.');
@@ -149,9 +151,15 @@ const TracerModel = (() => {
       }
       if(record.recognition!=null){
         const r=record.recognition;
-        if(r.algorithm!=='grid-sampling-v1'||!integer(r.threshold)||r.threshold<1||r.threshold>254
+        if(!['grid-sampling-v1','skeleton-orthogonal-v1'].includes(r.algorithm)||!integer(r.threshold)||r.threshold<1||r.threshold>254
           ||!['foreground_pixels','grid_edges','inferred_crossings','unresolved_crossings'].every(k=>integer(r[k])&&r[k]>=0&&r[k]<=16000000))throw Error('Ungültiger Erkennungsbericht.');
         drawing.recognition={algorithm:r.algorithm,threshold:r.threshold,...Object.fromEntries(['foreground_pixels','grid_edges','inferred_crossings','unresolved_crossings'].map(k=>[k,r[k]]))};
+        if(r.algorithm==='skeleton-orthogonal-v1'){
+          if(![4,8,12].includes(r.sample_size)||!integer(r.skeleton_pixels)||r.skeleton_pixels<4||r.skeleton_pixels>100000
+            ||!integer(r.thinning_iterations)||r.thinning_iterations<1||r.thinning_iterations>128
+            ||r.inferred_crossings!==0||r.grid_detection!==undefined)throw Error('Ungültiger Kurven-Erkennungsbericht.');
+          Object.assign(drawing.recognition,{sample_size:r.sample_size,skeleton_pixels:r.skeleton_pixels,thinning_iterations:r.thinning_iterations});
+        }
         if(r.grid_detection!==undefined){
           const g=r.grid_detection;
           if(!g||g.algorithm!=='line-bands-v1'||!integer(g.tested_grids)||g.tested_grids<1||g.tested_grids>16
@@ -327,7 +335,318 @@ const RasterTracer = (() => {
     }
     throw Error(`Kein geprüftes Raster gefunden (${tested}/16 Versuche). ${lastError} Raster manuell einstellen oder Vorlage manuell abzeichnen.`);
   }
-  return {recognize,recognizeAuto};
+  return {recognize,recognizeAuto,pixels};
+})();
+
+// A conservative curve recognizer. Full-resolution and sampled skeletons must
+// describe the same embedded graph before any orthogonal drawing is accepted.
+const CurveTracer = (() => {
+  const key=p=>p.join(','), same=(a,b)=>a[0]===b[0]&&a[1]===b[1];
+  function euler(mask,w,h){
+    // Euler characteristic for 8-connected ink / 4-connected background.
+    // Padding is white; count singletons, triples and diagonal pairs in 2x2s.
+    const ink=(x,y)=>x>=0&&y>=0&&x<w&&y<h?mask[y*w+x]:0;let sum=0;
+    for(let y=-1;y<h;y++)for(let x=-1;x<w;x++){
+      const a=ink(x,y),b=ink(x+1,y),c=ink(x,y+1),d=ink(x+1,y+1),n=a+b+c+d;
+      if(n===1)sum++;else if(n===3)sum--;else if(n===2&&((a&&d)||(b&&c)))sum-=2;
+    }
+    return sum/4;
+  }
+  function connected(mask,w,h,foreground){
+    if(foreground>200000)throw Error('Zu viel Vordergrund: höchstens 200000 dunkle Pixel.');
+    const seen=new Uint8Array(mask.length),queue=new Int32Array(foreground);
+    const first=mask.indexOf(1);queue[0]=first;seen[first]=1;let count=1;
+    for(let n=0;n<count;n++){
+      const i=queue[n],x=i%w,y=Math.floor(i/w);
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        const j=i+dy*w+dx;
+        if(x+dx<0||x+dx>=w||y+dy<0||y+dy>=h||!mask[j]||seen[j])continue;
+        seen[j]=1;queue[count++]=j;
+      }
+    }
+    if(count!==foreground)throw Error('Mehrere Komponenten oder Fremdpixel gefunden. Keine Bildteile werden entfernt.');
+  }
+  function thin(input,w,h) {
+    const mask=input.slice(), active=[];
+    for(let i=0;i<mask.length;i++)if(mask[i]){
+      if(i%w===0||i%w===w-1||i<w||i>=w*(h-1))throw Error('Die Kurve berührt den Bildrand. Mehr weißen Rand vorsehen.');
+      active.push(i);
+    }
+    if(active.length>200000)throw Error('Zu viel Vordergrund: höchstens 200000 dunkle Pixel.');
+    // Zhang-Suen, with simultaneous deletions in each subiteration.
+    for(let iteration=1;iteration<=128;iteration++){
+      let changed=false;
+      for(let phase=0;phase<2;phase++){
+        const remove=[];
+        for(const i of active){
+          if(!mask[i])continue;
+          const p=[mask[i-w],mask[i-w+1],mask[i+1],mask[i+w+1],mask[i+w],mask[i+w-1],mask[i-1],mask[i-w-1]];
+          const count=p.reduce((a,b)=>a+b,0);
+          if(count<2||count>6)continue;
+          let transitions=0;for(let k=0;k<8;k++)if(!p[k]&&p[(k+1)%8])transitions++;
+          if(transitions!==1)continue;
+          if(phase===0?(p[0]*p[2]*p[4]||p[2]*p[4]*p[6]):(p[0]*p[2]*p[6]||p[0]*p[4]*p[6]))continue;
+          remove.push(i);
+        }
+        if(remove.length)changed=true;
+        for(const i of remove)mask[i]=0;
+      }
+      if(!changed)return {mask,iterations:iteration};
+    }
+    throw Error('Skelettierung nach 128 Schritten abgebrochen. Dünnere Linien verwenden.');
+  }
+  function graph(mask,w,h,padding) {
+    const xy=i=>[i%w,Math.floor(i/w)], adjacent=new Map();
+    for(let i=0;i<mask.length;i++)if(mask[i]){
+      const [x,y]=xy(i), neighbors=[];
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        if((!dx&&!dy)||x+dx<0||x+dx>=w||y+dy<0||y+dy>=h||!mask[i+dy*w+dx])continue;
+        // Suppress a diagonal shortcut when a cardinal connection exists.
+        if(dx&&dy&&(mask[i+dx]||mask[i+dy*w]))continue;
+        neighbors.push(i+dy*w+dx);
+      }
+      if(neighbors.length<2)throw Error('Offene Linie, Kreuzungslücke oder isolierte Pixel gefunden.');
+      adjacent.set(i,neighbors);
+    }
+    if(adjacent.size<4||adjacent.size>100000)throw Error('Skelett braucht 4 bis 100000 Pixel.');
+    const reached=new Set(), queue=[adjacent.keys().next().value];
+    for(let n=0;n<queue.length;n++){
+      const i=queue[n];if(reached.has(i))continue;reached.add(i);
+      for(const j of adjacent.get(i))if(!reached.has(j))queue.push(j);
+    }
+    if(reached.size!==adjacent.size)throw Error('Mehrere Komponenten oder Fremdpixel gefunden.');
+    const boxes=[];
+    for(const [i,ns] of adjacent)if(ns.length>2){
+      const [x,y]=xy(i);boxes.push({lo:[x-padding,y-padding],hi:[x+padding,y+padding]});
+      if(boxes.length>2000)throw Error('Zu viele Verzweigungspixel. Saubere, getrennte Linien verwenden.');
+    }
+    // Merge nearby branching pixels into one crossing disk (a rectangle).
+    for(let changed=true;changed;){
+      changed=false;
+      outer:for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){
+        const a=boxes[i],b=boxes[j];
+        if([0,1].every(k=>a.lo[k]<=b.hi[k]+1&&b.lo[k]<=a.hi[k]+1)){
+          a.lo=a.lo.map((v,k)=>Math.min(v,b.lo[k]));a.hi=a.hi.map((v,k)=>Math.max(v,b.hi[k]));
+          boxes.splice(j,1);changed=true;break outer;
+        }
+      }
+    }
+    if(boxes.length>100)throw Error('Höchstens 100 getrennte Kurvenkreuzungen werden unterstützt.');
+    if(boxes.some(b=>b.hi.some((v,k)=>v-b.lo[k]>(padding===3?96:24))))
+      throw Error('Kreuzungsregion zu groß oder nicht ausreichend getrennt.');
+    const owner=new Map();
+    const inside=(p,b)=>p.every((v,k)=>v>=b.lo[k]&&v<=b.hi[k]);
+    boxes.forEach((b,id)=>{
+      b.ports=[];b.center=b.lo.map((v,k)=>(v+b.hi[k])/2);
+      for(const i of adjacent.keys())if(inside(xy(i),b))owner.set(i,id);
+      const members=[...owner].filter(([,node])=>node===id).map(([i])=>i),seen=new Set(),queue=[members[0]];
+      let internalEdges=0,filledSquares=0;
+      for(const i of members){
+        internalEdges+=adjacent.get(i).filter(j=>inside(xy(j),b)).length;
+        const [x,y]=xy(i);
+        // A filled 2x2 pixel block is a disk, not a hole in the image.
+        if(x<b.hi[0]&&y<b.hi[1]&&mask[i+1]&&mask[i+w]&&mask[i+w+1])filledSquares++;
+      }
+      for(let k=0;k<queue.length;k++){
+        const i=queue[k];if(seen.has(i))continue;seen.add(i);
+        for(const j of adjacent.get(i))if(inside(xy(j),b)&&!seen.has(j))queue.push(j);
+      }
+      if(seen.size!==members.length||internalEdges!==2*(members.length-1+filledSquares))
+        throw Error('Kreuzungsregion enthält eine Schleife oder einen fremden Strang.');
+    });
+    const visited=new Set(), edges=[];
+    const edgeKey=(a,b)=>a<b?`${a}:${b}`:`${b}:${a}`;
+    function walk(start,next){
+      const path=[start];let prev=start,current=next;
+      visited.add(edgeKey(prev,current));
+      while(true){
+        path.push(current);
+        if(owner.has(current)||current===start)break;
+        const ns=adjacent.get(current);
+        if(ns.length!==2)throw Error('Ungeklärte Verzweigung im Skelett.');
+        const following=ns.find(n=>n!==prev), k=edgeKey(current,following);
+        if(visited.has(k))throw Error('Skelettkante mehrfach besucht.');
+        visited.add(k);prev=current;current=following;
+      }
+      return path;
+    }
+    boxes.forEach((b,id)=>{
+      for(const [i,node] of owner)if(node===id)for(const j of adjacent.get(i))if(!owner.has(j)){
+        b.ports.push({pixel:i,outside:j,angle:Math.atan2(xy(j)[1]-b.center[1],xy(j)[0]-b.center[0])});
+      }
+      if(b.ports.length!==4)throw Error('Verzweigung oder zu nahe Kreuzungen: vier getrennte Arme erforderlich.');
+      b.ports.sort((a,b)=>a.angle-b.angle);
+      // Opposite arms must describe a transverse crossing, not a cusp/touch.
+      for(let p=0;p<4;p++){
+        const a=b.ports[p],c=b.ports[(p+1)%4];
+        const gap=(c.angle-a.angle+2*Math.PI)%(2*Math.PI);
+        if(gap<Math.PI/6||gap>5*Math.PI/6)throw Error('Berührung oder uneindeutiger Kreuzungswinkel.');
+      }
+    });
+    if(!boxes.length){
+      const start=adjacent.keys().next().value;
+      const cycle=walk(start,adjacent.get(start)[0]);
+      if(visited.size!==adjacent.size)throw Error('Skelett ist kein einzelner Zyklus.');
+      return {boxes,edges:[],cycle:cycle.map(xy),pixels:adjacent.size};
+    }
+    boxes.forEach((b,id)=>b.ports.forEach((p,index)=>{
+      if(visited.has(edgeKey(p.pixel,p.outside)))return;
+      const path=walk(p.pixel,p.outside),last=path.at(-1),node=owner.get(last);
+      const port=boxes[node].ports.findIndex(q=>q.pixel===last&&q.outside===path.at(-2));
+      if(port<0)throw Error('Kreuzungsarme lassen sich nicht verbinden.');
+      const edge={ends:[[id,index],[node,port]],path:path.map(xy)};
+      const e=edges.length;edges.push(edge);p.edge=e;boxes[node].ports[port].edge=e;
+    }));
+    // No degree-two islands, unaccounted edges or overlapping crossing disks.
+    for(const [i,ns] of adjacent)for(const j of ns){
+      if(owner.has(i)&&owner.get(i)===owner.get(j))continue;
+      if(!visited.has(edgeKey(i,j)))throw Error('Nicht erfasste Skelettkante.');
+    }
+    return {boxes,edges,cycle:null,pixels:adjacent.size};
+  }
+  function equivalent(fine,coarse,size) {
+    if(fine.boxes.length!==coarse.boxes.length)throw Error('Rasterung verändert die Kreuzungszahl.');
+    if(!fine.boxes.length)return;
+    const mapping=[],used=new Set();
+    for(const b of coarse.boxes){
+      const center=b.center.map(v=>(v+.5)*size);
+      const distances=fine.boxes.map((a,id)=>({id,d:Math.hypot(...a.center.map((v,k)=>v-center[k]))})).sort((a,b)=>a.d-b.d);
+      const hit=distances[0];
+      if(hit.d>size*3||used.has(hit.id))throw Error('Kreuzungen lassen sich nicht eindeutig zuordnen.');
+      used.add(hit.id);
+      const a=fine.boxes[hit.id];let best;
+      for(let shift=0;shift<4;shift++){
+        const errors=b.ports.map((p,k)=>Math.abs(Math.atan2(Math.sin(p.angle-a.ports[(k+shift)%4].angle),Math.cos(p.angle-a.ports[(k+shift)%4].angle))));
+        const error=errors.reduce((x,y)=>x+y,0);
+        if(errors.every(e=>e<Math.PI/3)&&(!best||error<best.error))best={shift,error};
+      }
+      if(!best)throw Error('Rasterung verändert die zyklische Armreihenfolge.');
+      mapping.push({id:hit.id,shift:best.shift});
+    }
+    const signature=edges=>edges.map(e=>e.ends.map(p=>p.join(':')).sort().join('-')).sort().join('|');
+    const mapped=coarse.edges.map(e=>({ends:e.ends.map(([id,p])=>[mapping[id].id,(p+mapping[id].shift)%4])}));
+    if(signature(mapped)!==signature(fine.edges))throw Error('Rasterung verändert die Verbindungen des planaren Graphen.');
+  }
+  function orthogonal(g) {
+    // Embed every digital edge in its own half-pixel corridor, then replace
+    // each crossing disk by four disjoint connectors to a central plus.
+    function expand(path){
+      const result=[path[0].map(v=>4*v)];
+      const to=p=>{
+        let a=result.at(-1);
+        if(a[0]!==p[0]&&a[1]!==p[1])throw Error('Interner nicht rechtwinkliger Schritt.');
+        const dx=Math.sign(p[0]-a[0]),dy=Math.sign(p[1]-a[1]);
+        while(!same(a,p)){a=[a[0]+dx,a[1]+dy];result.push(a);}
+      };
+      for(let i=1;i<path.length;i++){
+        const a=path[i-1],b=path[i],x=4*a[0],y=4*a[1],dx=b[0]-a[0],dy=b[1]-a[1];
+        if(dx&&dy){to([x+2*dx,y]);to([x+2*dx,y+4*dy]);}to(b.map(v=>4*v));
+      }
+      return result;
+    }
+    if(g.cycle)return {path:expand(g.cycle),centers:[]};
+    const boxes=g.boxes.map(b=>({lo:b.lo.map(v=>4*v-2),hi:b.hi.map(v=>4*v+2),center:b.center.map(v=>Math.round(4*v)),ports:b.ports}));
+    const inside=(p,b)=>p.every((v,k)=>v>=b.lo[k]&&v<=b.hi[k]);
+    const occupied=new Set(),paths=g.edges.map(e=>{
+      const path=expand(e.path),[a,b]=e.ends;
+      let lo=0,hi=path.length-1;
+      while(lo<hi&&inside(path[lo+1],boxes[a[0]]))lo++;
+      while(hi>lo&&inside(path[hi-1],boxes[b[0]]))hi--;
+      if(hi<=lo)throw Error('Zu wenig Platz zwischen Kreuzungsregionen.');
+      const route=path.slice(lo,hi+1);
+      for(const p of route){if(occupied.has(key(p)))throw Error('Rasterwege berühren sich außerhalb einer Kreuzung.');occupied.add(key(p));}
+      boxes[a[0]].ports[a[1]].endpoint=route[0];boxes[b[0]].ports[b[1]].endpoint=route.at(-1);
+      return route;
+    });
+    if(occupied.size>25000)throw Error('Zu viele Rasterkanten für den begrenzten Gitterexport.');
+    let searched=0;
+    const directions=[[0,-1],[1,0],[0,1],[-1,0]],permutations=[];
+    function permute(a,left){if(!left.length)permutations.push(a);else left.forEach(v=>permute([...a,v],left.filter(w=>w!==v)));}
+    permute([],[0,1,2,3]);
+    for(const b of boxes){
+      const [cx,cy]=b.center;
+      let connectors=null;
+      for(let shift=0;shift<4&&!connectors;shift++)for(const order of permutations){
+        const blocked=new Set(occupied),pins=directions.map(([x,y])=>[cx+2*x,cy+2*y]);
+        blocked.add(key(b.center));
+        for(const [dx,dy] of directions)for(let k=1;k<=2;k++)blocked.add(key([cx+k*dx,cy+k*dy]));
+        const trial=[];
+        for(const port of order){
+          // Sorted angles begin at the left/up half-plane. Any cyclic shift
+          // preserves the rotation system; opposite ports remain opposite.
+          const start=pins[(port+shift)%4],target=b.ports[port].endpoint;
+          const queue=[start],previous=new Map([[key(start),null]]);let end=null;
+          for(let n=0;n<queue.length;n++){
+            if(++searched>2000000)throw Error('Routensuche nach 2000000 Zuständen abgebrochen.');
+            const p=queue[n];if(same(p,target)){end=p;break;}
+            for(const [dx,dy] of directions){
+              const q=[p[0]+dx,p[1]+dy],k=key(q);
+              if(!inside(q,b)||previous.has(k)||(blocked.has(k)&&!same(q,target)))continue;
+              previous.set(k,p);queue.push(q);
+            }
+          }
+          if(!end)break;
+          const route=[];for(let p=end;p;p=previous.get(key(p)))route.push(p);
+          route.reverse();const [dx,dy]=directions[(port+shift)%4];
+          trial[port]=[b.center,[cx+dx,cy+dy],...route];
+          for(const p of route)blocked.add(key(p));
+        }
+        if(trial.filter(Boolean).length===4){connectors=trial;break;}
+      }
+      if(!connectors)throw Error('Kreuzungsregion lässt sich nicht ohne zusätzliche Kontakte rastern.');
+      b.connectors=connectors;
+      for(const route of connectors)for(const p of route.slice(1))occupied.add(key(p));
+    }
+    const result=[],visited=new Set();let node=0,port=0;
+    function append(path){if(result.length&&same(result.at(-1),path[0]))result.push(...path.slice(1));else result.push(...path);}
+    while(true){
+      const edge=g.boxes[node].ports[port].edge;
+      if(visited.has(edge))break;visited.add(edge);
+      append(boxes[node].connectors[port]);
+      const ends=g.edges[edge].ends,forward=ends[0][0]===node&&ends[0][1]===port;
+      append(forward?paths[edge]:[...paths[edge]].reverse());
+      [node,port]=ends[forward?1:0];
+      append([...boxes[node].connectors[port]].reverse());port=(port+2)%4;
+    }
+    if(visited.size!==g.edges.length||node!==0||port!==0)throw Error('Mehrere zyklische Stränge: nur einkomponentige Knoten werden unterstützt.');
+    return {path:result,centers:boxes.map(b=>b.center)};
+  }
+  function recognize(image,{threshold=160}={}) {
+    const {mask,foreground}=RasterTracer.pixels(image,threshold),{width,height}=image;
+    connected(mask,width,height,foreground);
+    const skeleton=thin(mask,width,height),fine=graph(skeleton.mask,width,height,3);
+    const characteristic=euler(mask,width,height);
+    if(characteristic!==euler(skeleton.mask,width,height)||characteristic!==-fine.boxes.length)
+      throw Error('Skelettierung verändert die Bildtopologie oder enthält ungeklärte kleine Schleifen.');
+    let lastError='Kein geeignetes Raster.';
+    for(const size of [12,8,4])try{
+      const w=Math.ceil(width/size),h=Math.ceil(height/size),sampled=new Uint8Array(w*h);
+      for(let i=0;i<skeleton.mask.length;i++)if(skeleton.mask[i])sampled[Math.floor(Math.floor(i/width)/size)*w+Math.floor((i%width)/size)]=1;
+      const coarse=graph(thin(sampled,w,h).mask,w,h,1);equivalent(fine,coarse,size);
+      const {path,centers}=orthogonal(coarse);
+      if(!same(path[0],path.at(-1)))throw Error('Gerasterter Strang ist nicht geschlossen.');
+      if(4*(path.length-1)+2*centers.length>100000)throw Error('Gitterexport würde 100000 Punkte überschreiten.');
+      const centerKeys=new Set(centers.map(key)),visits=new Map();
+      for(let i=0;i<path.length-1;i++){
+        const p=path[i],q=path[i+1],k=key(p),count=(visits.get(k)??0)+1;visits.set(k,count);
+        if(Math.abs(p[0]-q[0])+Math.abs(p[1]-q[1])!==1||count>(centerKeys.has(k)?2:1))
+          throw Error('Rasterung berührt oder überlappt sich außerhalb der geprüften Kreuzungen.');
+      }
+      const cycle=path.slice(0,-1),waypoints=cycle.filter((p,i)=>{
+        const a=cycle[(i+cycle.length-1)%cycle.length],b=cycle[(i+1)%cycle.length];
+        return (p[0]-a[0])*(b[1]-p[1])!==(p[1]-a[1])*(b[0]-p[0]);
+      }).map(([x,y])=>[x+2,-y-2]);
+      const found=TracerModel.intersections(waypoints);
+      const expected=new Set(centers.map(([x,y])=>key([x+2,-y-2])));
+      if(found.length!==expected.size||found.some(c=>!expected.has(key(c.coordinate))))throw Error('Rasterung erzeugt oder verliert Kreuzungen.');
+      return {schema_version:1,source_image:null,waypoints,crossings:[],...(found.length?{draft:true}:{}),
+        editor_view:{spacing:size/4,width,height,offset:[0,0],pixel_origin:[0,0]},
+        recognition:{algorithm:'skeleton-orthogonal-v1',threshold,foreground_pixels:foreground,grid_edges:path.length-1,
+          inferred_crossings:0,unresolved_crossings:found.length,sample_size:size,skeleton_pixels:fine.pixels,thinning_iterations:skeleton.iterations}};
+    }catch(error){lastError=error.message;}
+    throw Error(`Kurve nicht sicher erkennbar (3 Raster geprüft). ${lastError} Vorlage manuell abzeichnen.`);
+  }
+  return {recognize};
 })();
 </script>
 <script>
@@ -366,7 +685,7 @@ const RasterTracer = (() => {
     }
     let valid=false;try{drawing.record();valid=true;}catch{}
     get('download').disabled=!valid;get('undo').disabled=!pts.length;get('close').disabled=drawing.closed;
-    get('draft').disabled=!drawing.closed;get('recognize').disabled=!image;get('auto-recognize').disabled=!image;
+    get('draft').disabled=!drawing.closed;get('recognize').disabled=!image;get('auto-recognize').disabled=!image;get('curve-recognize').disabled=!image;
     get('point-mode').setAttribute('aria-pressed',String(mode==='points'));
     get('crossing-mode').setAttribute('aria-pressed',String(mode==='crossings'));
   }
@@ -385,7 +704,7 @@ const RasterTracer = (() => {
   get('close').addEventListener('click',()=>action(()=>{drawing.close();mode='crossings';}));
   get('undo').addEventListener('click',()=>action(()=>{drawing.undo();mode='points';}));
   get('clear').addEventListener('click',()=>action(()=>{const source=drawing.source;drawing=new TracerModel.Drawing();drawing.source=source;offset=[1,1];mode='points';}));
-  function rasterChanged(){const value=spacing();if(!Number.isInteger(value)||value<8||value>100)get('spacing').value=24;
+  function rasterChanged(){const value=spacing();if(!Number.isInteger(value)||value<1||value>100)get('spacing').value=24;
     for(const id of ['origin-x','origin-y']){const n=Number(get(id).value);if(!Number.isInteger(n)||n<0||n>=spacing())get(id).value=0;}drawing.recognition=null;drawing.view=null;render();}
   for(const id of ['spacing','origin-x','origin-y'])get(id).addEventListener('change',rasterChanged);
   get('show-image').addEventListener('change',render);
@@ -420,7 +739,7 @@ const RasterTracer = (() => {
       const raw=document.createElement('canvas');raw.width=canvas.width;raw.height=canvas.height;
       const context=raw.getContext('2d');context.drawImage(image,0,0,raw.width,raw.height);
       const pixels=context.getImageData(0,0,raw.width,raw.height),threshold=Number(get('threshold').value);
-      const record=automatic?RasterTracer.recognizeAuto(pixels,{threshold}):RasterTracer.recognize(pixels,{spacing:spacing(),origin:origin(),threshold});
+      const record=automatic==='curve'?CurveTracer.recognize(pixels,{threshold}):automatic?RasterTracer.recognizeAuto(pixels,{threshold}):RasterTracer.recognize(pixels,{spacing:spacing(),origin:origin(),threshold});
       record.source_image=drawing.source;
       const candidate=TracerModel.Drawing.load(record);drawing=candidate;offset=[0,0];mode='crossings';
       get('spacing').value=record.editor_view.spacing;get('origin-x').value=record.editor_view.pixel_origin[0];get('origin-y').value=record.editor_view.pixel_origin[1];
@@ -429,6 +748,7 @@ const RasterTracer = (() => {
   }
   get('recognize').addEventListener('click',()=>recognizeImage(false));
   get('auto-recognize').addEventListener('click',()=>recognizeImage(true));
+  get('curve-recognize').addEventListener('click',()=>recognizeImage('curve'));
   function download(allowDraft){action(()=>{
     drawing.view={spacing:spacing(),width:canvas.width,height:canvas.height,offset:[...offset],...(origin().some(v=>v!==0)?{pixel_origin:origin()}:{})};
     const record=drawing.record(allowDraft);

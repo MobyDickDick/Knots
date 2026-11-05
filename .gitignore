@@ -17,3 +17,5 @@ build/
 !examples/image_trace/*.svg
 !examples/raster_trace/*.json
 !examples/raster_trace/*.svg
+!examples/curve_trace/*.json
+!examples/curve_trace/*.svg

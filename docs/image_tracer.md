@@ -11,7 +11,9 @@ den Pixeln erkennen. Seit AP-03 bestimmt „Raster und Bild erkennen“ auch
 Rasterabstand und Pixelursprung automatisch; beide bleiben manuell einstellbar.
 Kreuzungslücken werden ausgewertet und unklare Wahlen bleiben offen. Details:
 [Automatische Rastererkennung](raster_tracer.md). Der folgende manuelle Ablauf
-bleibt verfügbar.
+bleibt verfügbar. Seit AP-04 ergänzt „Freie Kurve erkennen“ die Skelettierung
+sauberer durchgezogener Kurven ohne Zeichenraster. Deren Kreuzungswahlen werden
+immer manuell ergänzt: [Freie Kurven erkennen](curve_tracer.md).
 
 ## Bedienung
 
@@ -78,7 +80,7 @@ braucht genau einen Eintrag:
 `over_segment` muss eines der zwei tatsächlich beteiligten Segmente sein.
 Zusätzliche, doppelte, fehlende und nicht passende Angaben führen zum Fehler.
 Optionales `editor_view` enthält `spacing`, `offset`, `width` und `height` für
-die Bildausrichtung; zusätzlich kann `pixel_origin: [x, y]` zwei ganze
+die Bildausrichtung (`spacing` jetzt 1–100 Pixel); zusätzlich kann `pixel_origin: [x, y]` zwei ganze
 Pixelversätze innerhalb einer Rasterzelle speichern. Die Gitterkonvertierung
 hängt davon nicht ab. Automatisch erzeugte Annotationen enthalten außerdem
 einen `recognition`-Bericht, der beim Python-Export erhalten bleibt. Bei
@@ -132,8 +134,9 @@ Segmentpaare, ohne Routensuche. Ungültige Eingaben führen vor dem Export zu
 einer Fehlermeldung und CLI-Status 2.
 
 Die manuelle erste Stufe erkennt keine Pixel. AP-02 ergänzt eine auf ein
-eingestelltes rechtwinkliges Raster beschränkte Mittellinienerkennung. Freie
-Kurven, automatische Umroutung, mehrere Komponenten, Verschieben einzelner
+eingestelltes rechtwinkliges Raster beschränkte Mittellinienerkennung. AP-04
+ergänzt eine begrenzte automatische Umzeichnung sauberer freier Kurven.
+Allgemeine Scanaufbereitung, mehrere Komponenten, Verschieben einzelner
 Stützpunkte und eine vollständige Tastatur-Zeichenbedienung sind nicht enthalten.
 
 ## Beispiel und Abnahme
