@@ -19,3 +19,5 @@ build/
 !examples/raster_trace/*.svg
 !examples/curve_trace/*.json
 !examples/curve_trace/*.svg
+!examples/scan_trace/*.json
+!examples/scan_trace/*.svg

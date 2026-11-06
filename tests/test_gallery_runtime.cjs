@@ -98,11 +98,11 @@ assert.equal(elements['mode-3d'].attributes['aria-pressed'], 'true');
 
 const initial = snapshot();
 const selectedKnot=knots[knots.length>1?1:0];
-if(['manual_image_annotation','reviewed_raster_annotation','reviewed_curve_annotation'].includes(selectedKnot.metadata?.source)) {
+if(['manual_image_annotation','reviewed_raster_annotation','reviewed_curve_annotation','reviewed_scan_annotation'].includes(selectedKnot.metadata?.source)) {
   assert.equal(elements['version-control'].hidden,true);
   assert.equal(elements['classification-evidence'].hidden,false);
   assert.ok(elements['classification-evidence'].textContent.includes('Bildvorlage'));
-  const label=selectedKnot.metadata.source==='reviewed_curve_annotation'?'Kurvenerkennung':selectedKnot.metadata.source==='reviewed_raster_annotation'?'Rastererkennung':'Bild-Abzeichner';
+  const label=selectedKnot.metadata.source==='reviewed_scan_annotation'?'Scan-Aufbereitung':selectedKnot.metadata.source==='reviewed_curve_annotation'?'Kurvenerkennung':selectedKnot.metadata.source==='reviewed_raster_annotation'?'Rastererkennung':'Bild-Abzeichner';
   assert.ok(elements.details.children.some(child=>child.children.some(item=>item.textContent===label)));
 }
 if(selectedKnot.original_points) {

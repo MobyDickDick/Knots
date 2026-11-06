@@ -207,9 +207,13 @@ button:focus-visible,input:focus-visible,canvas:focus-visible { outline:3px soli
     const values=[['Kreuzungen',active.crossings],['Gitterkanten',active.points.length-1],['Determinante',knot.determinant ?? 'ungeklärt']];
     if(knot.metadata) {
       const m=knot.metadata;
-      const imageAnnotation=['manual_image_annotation','reviewed_raster_annotation','reviewed_curve_annotation'].includes(m.source);
+      const imageAnnotation=['manual_image_annotation','reviewed_raster_annotation','reviewed_curve_annotation','reviewed_scan_annotation'].includes(m.source);
       if(imageAnnotation) {
-        values.push(['Quelle',m.source==='reviewed_curve_annotation'?'Kurvenerkennung':m.source==='reviewed_raster_annotation'?'Rastererkennung':'Bild-Abzeichner'],['Vorlage',m.annotation.source_image??'ohne Bilddatei'],['Stützpunkte',m.annotation.waypoints.length]);
+        values.push(['Quelle',m.source==='reviewed_scan_annotation'?'Scan-Aufbereitung':m.source==='reviewed_curve_annotation'?'Kurvenerkennung':m.source==='reviewed_raster_annotation'?'Rastererkennung':'Bild-Abzeichner'],['Vorlage',m.annotation.source_image??'ohne Bilddatei'],['Stützpunkte',m.annotation.waypoints.length]);
+        if(m.source==='reviewed_scan_annotation'){
+          const p=m.annotation.recognition.preprocessing;
+          values.push(['Scan-Radius',p.window_radius],['Mindestkontrast',p.contrast]);
+        }
       } else {
         values.push(['Punkte vorher → nachher',m.point_count_before+' → '+m.point_count_after],
           ['abgesicherte Umformungen',m.moves.length],['Seed',m.provenance.candidate_seed],
@@ -217,7 +221,7 @@ button:focus-visible,input:focus-visible,canvas:focus-visible { outline:3px soli
       }
       $('classification-evidence').hidden=false;
       $('classification-evidence').textContent=(m.classification.status==='certified'?'Belegt: ':'Ungeklärt: ')+m.classification.evidence+
-        (imageAnnotation?(m.source==='reviewed_curve_annotation'?'. Aus einer freien Kurve erkannt; Über-/Unterführungen manuell gewählt. Die Übereinstimmung mit der Bildvorlage muss geprüft werden.':m.source==='reviewed_raster_annotation'?'. Aus einem Rasterbild erkannt und als Annotation übernommen. Die Übereinstimmung mit der Bildvorlage muss geprüft werden.':'. Aus manuell gesetzten Stützpunkten und Kreuzungswahlen erzeugt. Die Übereinstimmung mit der Bildvorlage muss beim Abzeichnen geprüft werden.'):
+        (imageAnnotation?(m.source==='reviewed_scan_annotation'?'. Lokal aufgehellte Scan-Maske als freie Kurve erkannt; Über-/Unterführungen manuell gewählt. Maske und Pfad müssen mit der Bildvorlage verglichen werden.':m.source==='reviewed_curve_annotation'?'. Aus einer freien Kurve erkannt; Über-/Unterführungen manuell gewählt. Die Übereinstimmung mit der Bildvorlage muss geprüft werden.':m.source==='reviewed_raster_annotation'?'. Aus einem Rasterbild erkannt und als Annotation übernommen. Die Übereinstimmung mit der Bildvorlage muss geprüft werden.':'. Aus manuell gesetzten Stützpunkten und Kreuzungswahlen erzeugt. Die Übereinstimmung mit der Bildvorlage muss beim Abzeichnen geprüft werden.'):
         '. Original und Ergebnis sind durch protokollierte Umformungen äquivalent. Keine globale Minimalität; gleiche Invarianten beweisen keine Knotenäquivalenz.');
     } else $('classification-evidence').hidden=true;
     for(const [label,value] of values) {

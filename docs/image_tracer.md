@@ -14,6 +14,9 @@ Kreuzungslücken werden ausgewertet und unklare Wahlen bleiben offen. Details:
 bleibt verfügbar. Seit AP-04 ergänzt „Freie Kurve erkennen“ die Skelettierung
 sauberer durchgezogener Kurven ohne Zeichenraster. Deren Kreuzungswahlen werden
 immer manuell ergänzt: [Freie Kurven erkennen](curve_tracer.md).
+AP-05 ergänzt eine lokale Helligkeitskorrektur mit Maskenvorschau für
+ungleichmäßige Beleuchtung und schwache Papiertextur:
+[Scan-Aufbereitung](scan_tracer.md).
 
 ## Bedienung
 

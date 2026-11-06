@@ -104,6 +104,18 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
                     or type(recognition.get("thinning_iterations")) is not int or not 1 <= recognition["thinning_iterations"] <= 128
                     or recognition["inferred_crossings"] != 0 or "grid_detection" in recognition):
                 raise ValueError("invalid curve recognition report")
+        preprocessing = recognition.get("preprocessing")
+        if "preprocessing" in recognition:
+            if (not curve or not isinstance(preprocessing, dict)
+                    or preprocessing.get("algorithm") != "local-mean-v1"
+                    or type(preprocessing.get("window_radius")) is not int or not 8 <= preprocessing["window_radius"] <= 80
+                    or type(preprocessing.get("contrast")) is not int or not 5 <= preprocessing["contrast"] <= 100
+                    or type(preprocessing.get("foreground_pixels")) is not int
+                    or not 1 <= preprocessing["foreground_pixels"] <= 200_000
+                    or preprocessing["foreground_pixels"] != recognition["foreground_pixels"]
+                    or any(type(preprocessing.get(k)) is not int for k in ("background_min", "background_max"))
+                    or not 0 <= preprocessing["background_min"] <= preprocessing["background_max"] <= 255):
+                raise ValueError("invalid scan preprocessing report")
         grid = recognition.get("grid_detection")
         if "grid_detection" in recognition:
             if (not isinstance(grid, dict) or grid.get("algorithm") != "line-bands-v1"
@@ -115,6 +127,10 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
         if grid is not None:
             recognition["grid_detection"] = {k: grid[k] for k in
                                             ("algorithm", "tested_grids", "horizontal_lines", "vertical_lines")}
+        if preprocessing is not None:
+            recognition["preprocessing"] = {k: preprocessing[k] for k in
+                                           ("algorithm", "window_radius", "contrast", "foreground_pixels",
+                                            "background_min", "background_max")}
     return DiagramAnnotation(tuple(_coordinate(p, f"waypoint {i}")
                                    for i, p in enumerate(record["waypoints"])), tuple(choices), source, view, recognition, draft)
 
@@ -270,7 +286,8 @@ def write_traced_diagram(annotation: DiagramAnnotation, directory: str | Path,
     classification = classify_knot(trace.points)
     source = "manual_image_annotation"
     if annotation.recognition:
-        source = ("reviewed_curve_annotation" if annotation.recognition["algorithm"] == "skeleton-orthogonal-v1"
+        source = ("reviewed_scan_annotation" if "preprocessing" in annotation.recognition
+                  else "reviewed_curve_annotation" if annotation.recognition["algorithm"] == "skeleton-orthogonal-v1"
                   else "reviewed_raster_annotation")
     metadata = {"source": source, "refinement": REFINEMENT,
                 "annotation": annotation_to_dict(annotation), "turtle_code": trace.code,

@@ -39,6 +39,13 @@ Prüfe danach den Pfad und die Über-/Unterführung an jeder Kreuzung. Die gespe
 <button id="draft" disabled>Entwurf speichern</button>
 </div>
 <div class="tools">
+<label>Scan: Fensterradius <input id="scan-radius" type="number" min="8" max="80" value="24"></label>
+<label>Mindestkontrast <input id="scan-contrast" type="number" min="5" max="100" value="30"></label>
+<button id="scan-preview" disabled>Scan-Vorschau</button>
+<button id="scan-recognize" disabled>Scan-Kurve erkennen</button>
+<label><input id="show-scan" type="checkbox"> Aufbereitete Maske anzeigen</label>
+</div>
+<div class="tools">
 <button id="point-mode" aria-pressed="true">1 · Stützpunkte</button>
 <button id="crossing-mode" aria-pressed="false">2 · Kreuzungen</button>
 <button id="close">Linie schließen</button>
@@ -55,6 +62,7 @@ Prüfe danach den Pfad und die Über-/Unterführung an jeder Kreuzung. Die gespe
 <li>Optional eine Bildvorlage laden. Sie bleibt auf deinem Computer. Das Bild wird proportional auf die Zeichenfläche eingepasst.</li>
 <li>Für ein sauberes rechtwinkliges Rasterbild: „Raster und Bild erkennen“ bestimmt Abstand und Ursprung und zeichnet den Pfad nach. Alternativ das Raster selbst einstellen und „Bild automatisch erkennen“ wählen. Dunkle Linien auf hellem Grund werden lokal ausgewertet. Das Ergebnis mit der Vorlage vergleichen; orange Kreuzungen brauchen eine manuelle Wahl. „Entwurf speichern“ erhält auch offene Wahlen.</li>
 <li>Für eine freie Kurve: „Freie Kurve erkennen“ skelettiert eine durchgezogene dunkle Linie und überführt ihren geprüften Graphen auf ein feines rechtwinkliges Raster. Alle Über-/Unterführungen anschließend manuell wählen. Kreuzungslücken, Berührungen, Beschriftungen und Papierstrukturen sind in diesem Modus nicht unterstützt.</li>
+<li>Für ungleichmäßig beleuchtete Vorlagen: „Scan-Vorschau“ zeigt die lokal aufgehellte Schwarzweißmaske. Radius größer als die Strichbreite wählen; Mindestkontrast unterhalb des Linienkontrasts und oberhalb schwacher Papiertextur einstellen. Original und Maske mit dem Schalter vergleichen, dann „Scan-Kurve erkennen“ wählen. Es werden keine Komponenten entfernt oder Lücken geschlossen. Die gesamte Maske und den Pfad mit der Vorlage vergleichen; Schrift, Flecken, starke Textur und Kreuzungslücken bleiben nicht unterstützt.</li>
 <li>Raster einstellen und die Linie einmal der Reihe nach abklicken. Der nächste Punkt rastet horizontal oder vertikal zum vorherigen ein. Zusätzliche Ecken helfen beim Nachzeichnen runder Bögen. Den Startpunkt nicht nochmals setzen.</li>
 <li>Mit „Linie schließen“ die letzte Strecke zum Start ergänzen. Auch diese muss waagerecht oder senkrecht sein. Bei einer Fehlermeldung den letzten Punkt zurücknehmen und korrigieren.</li>
 <li>Im Modus „Kreuzungen“ auf jeden orangefarbenen Kreis klicken. Ein weiterer Klick wechselt den oberen Strang. Alle Kreuzungen müssen grün sein.</li>
@@ -159,6 +167,16 @@ const TracerModel = (() => {
             ||!integer(r.thinning_iterations)||r.thinning_iterations<1||r.thinning_iterations>128
             ||r.inferred_crossings!==0||r.grid_detection!==undefined)throw Error('Ungültiger Kurven-Erkennungsbericht.');
           Object.assign(drawing.recognition,{sample_size:r.sample_size,skeleton_pixels:r.skeleton_pixels,thinning_iterations:r.thinning_iterations});
+        }
+        if(r.preprocessing!==undefined){
+          const p=r.preprocessing;
+          if(r.algorithm!=='skeleton-orthogonal-v1'||!p||p.algorithm!=='local-mean-v1'
+            ||!integer(p.window_radius)||p.window_radius<8||p.window_radius>80
+            ||!integer(p.contrast)||p.contrast<5||p.contrast>100
+            ||!integer(p.foreground_pixels)||p.foreground_pixels<1||p.foreground_pixels>200000||p.foreground_pixels!==r.foreground_pixels
+            ||!integer(p.background_min)||!integer(p.background_max)||p.background_min<0||p.background_max>255||p.background_min>p.background_max)
+            throw Error('Ungültiger Scan-Aufbereitungsbericht.');
+          drawing.recognition.preprocessing=Object.fromEntries(['algorithm','window_radius','contrast','foreground_pixels','background_min','background_max'].map(k=>[k,p[k]]));
         }
         if(r.grid_detection!==undefined){
           const g=r.grid_detection;
@@ -336,6 +354,41 @@ const RasterTracer = (() => {
     throw Error(`Kein geprüftes Raster gefunden (${tested}/16 Versuche). ${lastError} Raster manuell einstellen oder Vorlage manuell abzeichnen.`);
   }
   return {recognize,recognizeAuto,pixels};
+})();
+
+// Bounded local thresholding. No denoising, gap closure or component deletion.
+const ScanPreprocessor = (() => {
+  function prepare(image,{radius=24,contrast=30}={}) {
+    // Validate dimensions before allocating the integral image and output mask.
+    const {width,height,data}=image;
+    if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1||width>1200||height>900||!data||data.length!==4*width*height)
+      throw Error('Scan-Aufbereitung unterstützt höchstens 1200 × 900 Pixel.');
+    if(!Number.isSafeInteger(radius)||radius<8||radius>80||!Number.isSafeInteger(contrast)||contrast<5||contrast>100)
+      throw Error('Scan-Radius oder Mindestkontrast ungültig.');
+    const light=new Uint8Array(width*height),stride=width+1,integral=new Float64Array(stride*(height+1));
+    for(let y=0;y<height;y++){
+      let sum=0;
+      for(let x=0;x<width;x++){
+        const i=y*width+x,k=4*i,alpha=data[k+3]/255;
+        light[i]=Math.round((.299*data[k]+.587*data[k+1]+.114*data[k+2])*alpha+255*(1-alpha));
+        sum+=light[i];integral[(y+1)*stride+x+1]=integral[y*stride+x+1]+sum;
+      }
+    }
+    const output=new Uint8ClampedArray(data.length);let foreground=0,min=255,max=0;
+    for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+      const x0=Math.max(0,x-radius),x1=Math.min(width,x+radius+1),y0=Math.max(0,y-radius),y1=Math.min(height,y+radius+1);
+      const mean=(integral[y1*stride+x1]-integral[y0*stride+x1]-integral[y1*stride+x0]+integral[y0*stride+x0])/((x1-x0)*(y1-y0));
+      min=Math.min(min,Math.round(mean));max=Math.max(max,Math.round(mean));
+      const i=y*width+x,dark=mean-light[i]>=contrast,value=dark?0:255;
+      if(dark)foreground++;
+      output.set([value,value,value,255],4*i);
+    }
+    if(!foreground)throw Error('Keine kontrastreiche Linie gefunden. Scan-Mindestkontrast prüfen.');
+    if(foreground>200000)throw Error('Scan-Maske überschreitet 200000 Vordergrundpixel.');
+    return {image:{width,height,data:output},report:{algorithm:'local-mean-v1',window_radius:radius,contrast,
+      foreground_pixels:foreground,background_min:min,background_max:max}};
+  }
+  return {prepare};
 })();
 
 // A conservative curve recognizer. Full-resolution and sampled skeletons must
@@ -648,12 +701,19 @@ const CurveTracer = (() => {
   }
   return {recognize};
 })();
+const ScanTracer = {
+  recognize(image,options){
+    const prepared=ScanPreprocessor.prepare(image,options),record=CurveTracer.recognize(prepared.image);
+    record.recognition.preprocessing=prepared.report;
+    return record;
+  }
+};
 </script>
 <script>
 (() => {
   const get=id=>document.getElementById(id), canvas=get('scene'), ctx=canvas.getContext('2d');
   let drawing=new TracerModel.Drawing(), mode='points', image=null, imageUrl=null, imageRequest=0;
-  let offset=[1,1];
+  let offset=[1,1],scanPreview=null;
   const spacing=()=>Number(get('spacing').value);
   const origin=()=>[Number(get('origin-x').value),Number(get('origin-y').value)];
   const screen=([x,y])=>[(x+offset[0])*spacing()+origin()[0],(-y+offset[1])*spacing()+origin()[1]];
@@ -662,7 +722,7 @@ const CurveTracer = (() => {
   function line(a,b,color,width=3){ctx.beginPath();ctx.moveTo(...screen(a));ctx.lineTo(...screen(b));ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();}
   function render() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    if(image&&get('show-image').checked){ctx.globalAlpha=.4;ctx.drawImage(image,0,0,canvas.width,canvas.height);ctx.globalAlpha=1;}
+    if(image&&get('show-image').checked){ctx.globalAlpha=.4;ctx.drawImage(get('show-scan').checked&&scanPreview?scanPreview:image,0,0,canvas.width,canvas.height);ctx.globalAlpha=1;}
     ctx.lineWidth=1;ctx.strokeStyle='#dfe7ee';
     for(let x=origin()[0];x<=canvas.width;x+=spacing()){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
     for(let y=origin()[1];y<=canvas.height;y+=spacing()){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
@@ -686,6 +746,7 @@ const CurveTracer = (() => {
     let valid=false;try{drawing.record();valid=true;}catch{}
     get('download').disabled=!valid;get('undo').disabled=!pts.length;get('close').disabled=drawing.closed;
     get('draft').disabled=!drawing.closed;get('recognize').disabled=!image;get('auto-recognize').disabled=!image;get('curve-recognize').disabled=!image;
+    get('scan-preview').disabled=!image;get('scan-recognize').disabled=!image;
     get('point-mode').setAttribute('aria-pressed',String(mode==='points'));
     get('crossing-mode').setAttribute('aria-pressed',String(mode==='crossings'));
   }
@@ -708,11 +769,13 @@ const CurveTracer = (() => {
     for(const id of ['origin-x','origin-y']){const n=Number(get(id).value);if(!Number.isInteger(n)||n<0||n>=spacing())get(id).value=0;}drawing.recognition=null;drawing.view=null;render();}
   for(const id of ['spacing','origin-x','origin-y'])get(id).addEventListener('change',rasterChanged);
   get('show-image').addEventListener('change',render);
+  get('show-scan').addEventListener('change',render);
+  for(const id of ['scan-radius','scan-contrast'])get(id).addEventListener('change',()=>{scanPreview=null;render();});
   get('image').addEventListener('change',()=>{
     const file=get('image').files[0];if(!file)return;
     const request=++imageRequest, candidate=new Image(), url=URL.createObjectURL(file);
     candidate.onload=()=>{if(request!==imageRequest){URL.revokeObjectURL(url);return;}if(imageUrl)URL.revokeObjectURL(imageUrl);
-      imageUrl=url;image=candidate;if(drawing.source!==file.name)drawing.recognition=null;drawing.source=file.name;
+      imageUrl=url;image=candidate;scanPreview=null;if(drawing.source!==file.name)drawing.recognition=null;drawing.source=file.name;
       const factor=Math.min(1,1200/image.naturalWidth,900/image.naturalHeight);
       canvas.width=drawing.view?.width??Math.round(image.naturalWidth*factor);canvas.height=drawing.view?.height??Math.round(image.naturalHeight*factor);render();message('Bild geladen. „Raster und Bild erkennen“ wählen, Raster selbst einstellen oder Stützpunkte setzen.');};
     candidate.onerror=()=>{URL.revokeObjectURL(url);message('Bild konnte nicht geladen werden.',true);};candidate.src=url;
@@ -728,20 +791,39 @@ const CurveTracer = (() => {
       get('spacing').value=candidate.view?.spacing??Math.max(8,Math.min(24,Math.floor(1104/width),Math.floor(720/height)));
       get('origin-x').value=candidate.view?.pixel_origin?.[0]??0;get('origin-y').value=candidate.view?.pixel_origin?.[1]??0;
       canvas.width=candidate.view?.width??Math.max(1104,width*spacing());canvas.height=candidate.view?.height??Math.max(720,height*spacing());
-      ++imageRequest;image=null;if(imageUrl)URL.revokeObjectURL(imageUrl);imageUrl=null;
+      ++imageRequest;image=null;scanPreview=null;if(imageUrl)URL.revokeObjectURL(imageUrl);imageUrl=null;
+      if(candidate.recognition?.preprocessing){get('scan-radius').value=candidate.recognition.preprocessing.window_radius;get('scan-contrast').value=candidate.recognition.preprocessing.contrast;}
       status();render();
     }catch(error){message(error.message,true);}get('import').value='';
   });
+  function imagePixels(){
+    if(!image)throw Error('Bitte zuerst eine Bildvorlage laden.');
+    // Read a clean canvas, never the grid, annotations or faded display layer.
+    const raw=document.createElement('canvas');raw.width=canvas.width;raw.height=canvas.height;
+    const context=raw.getContext('2d');context.drawImage(image,0,0,raw.width,raw.height);
+    return context.getImageData(0,0,raw.width,raw.height);
+  }
+  const scanOptions=()=>({radius:Number(get('scan-radius').value),contrast:Number(get('scan-contrast').value)});
+  function previewCanvas(prepared){
+    const preview=document.createElement('canvas');preview.width=prepared.image.width;preview.height=prepared.image.height;
+    const context=preview.getContext('2d'),pixels=context.createImageData(preview.width,preview.height);
+    pixels.data.set(prepared.image.data);context.putImageData(pixels,0,0);return preview;
+  }
+  get('scan-preview').addEventListener('click',()=>{
+    try{const prepared=ScanPreprocessor.prepare(imagePixels(),scanOptions()),preview=previewCanvas(prepared);
+      scanPreview=preview;get('show-scan').checked=true;render();
+      message(`Scan-Maske: ${prepared.report.foreground_pixels} dunkle Pixel. Mit dem Original vergleichen; anschließend „Scan-Kurve erkennen“ wählen.`);
+    }catch(error){message(error.message,true);}
+  });
   function recognizeImage(automatic){
     try{
-      if(!image)throw Error('Bitte zuerst eine Bildvorlage laden.');
-      // Read a clean canvas, never the grid, annotations or faded display layer.
-      const raw=document.createElement('canvas');raw.width=canvas.width;raw.height=canvas.height;
-      const context=raw.getContext('2d');context.drawImage(image,0,0,raw.width,raw.height);
-      const pixels=context.getImageData(0,0,raw.width,raw.height),threshold=Number(get('threshold').value);
-      const record=automatic==='curve'?CurveTracer.recognize(pixels,{threshold}):automatic?RasterTracer.recognizeAuto(pixels,{threshold}):RasterTracer.recognize(pixels,{spacing:spacing(),origin:origin(),threshold});
+      const pixels=imagePixels(),threshold=Number(get('threshold').value);
+      const prepared=automatic==='scan'?ScanPreprocessor.prepare(pixels,scanOptions()):null;
+      const record=prepared?CurveTracer.recognize(prepared.image):automatic==='curve'?CurveTracer.recognize(pixels,{threshold}):automatic?RasterTracer.recognizeAuto(pixels,{threshold}):RasterTracer.recognize(pixels,{spacing:spacing(),origin:origin(),threshold});
+      if(prepared)record.recognition.preprocessing=prepared.report;
       record.source_image=drawing.source;
-      const candidate=TracerModel.Drawing.load(record);drawing=candidate;offset=[0,0];mode='crossings';
+      const candidate=TracerModel.Drawing.load(record),preview=prepared?previewCanvas(prepared):null;
+      drawing=candidate;scanPreview=preview;offset=[0,0];mode='crossings';
       get('spacing').value=record.editor_view.spacing;get('origin-x').value=record.editor_view.pixel_origin[0];get('origin-y').value=record.editor_view.pixel_origin[1];
       render();message(`${automatic?`Raster: ${spacing()} Pixel, Ursprung ${origin().join('/')}. `:''}Erkannt: ${drawing.points.length} Stützpunkte, ${drawing.choices.size} eindeutige Kreuzungswahlen, ${drawing.recognition.unresolved_crossings} offene Wahlen. Ergebnis mit der Vorlage vergleichen und offene Kreuzungen wählen.`);
     }catch(error){message(error.message,true);}
@@ -749,6 +831,7 @@ const CurveTracer = (() => {
   get('recognize').addEventListener('click',()=>recognizeImage(false));
   get('auto-recognize').addEventListener('click',()=>recognizeImage(true));
   get('curve-recognize').addEventListener('click',()=>recognizeImage('curve'));
+  get('scan-recognize').addEventListener('click',()=>recognizeImage('scan'));
   function download(allowDraft){action(()=>{
     drawing.view={spacing:spacing(),width:canvas.width,height:canvas.height,offset:[...offset],...(origin().some(v=>v!==0)?{pixel_origin:origin()}:{})};
     const record=drawing.record(allowDraft);

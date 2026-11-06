@@ -217,6 +217,35 @@ class ImageTracerTests(unittest.TestCase):
             with self.subTest(spacing=spacing), self.assertRaises(ValueError):
                 annotation_from_dict({**record, "editor_view": {**record["editor_view"], "spacing": spacing}})
 
+    def test_scan_report_roundtrip_validation_and_export(self):
+        record = annotation_to_dict(annotate_grid_candidate(trefoil_candidate()))
+        preprocessing = {"algorithm": "local-mean-v1", "window_radius": 24, "contrast": 30,
+                         "foreground_pixels": 12000, "background_min": 108, "background_max": 242}
+        report = {"algorithm": "skeleton-orthogonal-v1", "threshold": 160,
+                  "foreground_pixels": 12000, "grid_edges": 900, "inferred_crossings": 0,
+                  "unresolved_crossings": 3, "sample_size": 12, "skeleton_pixels": 2100,
+                  "thinning_iterations": 5, "preprocessing": preprocessing}
+        record["recognition"] = report
+        self.assertEqual(annotation_to_dict(annotation_from_dict(record)), record)
+        with TemporaryDirectory() as directory:
+            result = json.loads(write_traced_diagram(annotation_from_dict(record), directory).read_text())
+            self.assertEqual(result["source"], "reviewed_scan_annotation")
+            self.assertEqual(result["annotation"], record)
+            self.assertIn("Scan-Aufbereitung", (Path(directory) / "index.html").read_text(encoding="utf-8"))
+        invalid = [None, [], {}, {**preprocessing, "algorithm": "unknown"}]
+        for key, values in {"window_radius": (True, 7, 81, 24.0), "contrast": (False, 4, 101, 30.0),
+                            "foreground_pixels": (True, 0, 12001, 200001),
+                            "background_min": (-1, 243, 108.0), "background_max": (107, 256, False)}.items():
+            invalid.extend({**preprocessing, key: value} for value in values)
+        for bad in invalid:
+            with self.subTest(preprocessing=bad), self.assertRaisesRegex(ValueError, "scan preprocessing"):
+                annotation_from_dict({**record, "recognition": {**report, "preprocessing": bad}})
+        raster_report = {key: report[key] for key in ("threshold", "foreground_pixels", "grid_edges",
+                                                     "inferred_crossings", "unresolved_crossings")}
+        raster_report.update(algorithm="grid-sampling-v1", preprocessing=preprocessing)
+        with self.assertRaisesRegex(ValueError, "scan preprocessing"):
+            annotation_from_dict({**record, "recognition": raster_report})
+
     def test_vertex_budget_precedes_expansion_and_counts_layer_switches(self):
         annotation = annotate_grid_candidate(trefoil_candidate())
         size = len(trace_annotation(annotation).points) - 1

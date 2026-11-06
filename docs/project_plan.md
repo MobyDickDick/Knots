@@ -443,12 +443,40 @@ Python-/Node-Tests verwenden in der Windows-Sandbox `TEMP`/`TMP` im
 Projektverzeichnis `.test_tmp`. Eine manuelle Browserprüfung ist nicht Teil
 dieser Abnahme.
 
-## Nächste Ausbaustufe: gescannte Vorlagen (weiter offen)
+## Arbeitspaket AP-05: Lokale Aufbereitung gescannter Vorlagen
+
+Status: **umgesetzt am 06.11.2026**. Der erste begrenzte Schritt der bisher
+offenen Scan-Ausbaustufe korrigiert langsam veränderliche Beleuchtung und
+schwache Papiertextur für durchgezogene freie Kurven. Allgemeine Scanerkennung
+bleibt ein weiteres Vorhaben.
+
+- [x] Alpha-korrigierte Helligkeit und lokale Mittelwerte mit einem Summenbild
+  berechnen; Schwarzweißmaske mit explizitem Mindestkontrast erzeugen.
+- [x] Offline-Vorschau mit Originalvergleich, begrenzten Parametern und eigenem
+  Scan-Erkennungsweg im Editor ergänzen; Fehler erhalten Zeichnung und Raster.
+- [x] Die vollständige Maske durch die geometrischen und topologischen
+  AP-04-Prüfungen führen; weder Komponenten entfernen noch Lücken schließen.
+- [x] Verwendete Parameter und Maskenzähler in JavaScript/Python validieren,
+  im JSON-Roundtrip erhalten und als Scan-Herkunft in der Galerie anzeigen.
+- [x] Reproduzierbare simulierte Scan-PNG, Maske, Kontrollüberlagerung,
+  Entwurf, ergänzte Annotation und vollständigen Galerieexport bereitstellen.
+- [x] Schatten, Textur, Drehungen, Spiegel, Grenzen, Fehlerfälle,
+  Editor-Ereignisse, Klassifikation, Turtle-Roundtrip und Galerie prüfen.
+
+Abnahme: 99 Python-Tests, vier Node-Editor-/Erkennungsprüfungen und sechs
+Galerieprüfungen erfolgreich. Das simulierte Scan-Beispiel ergibt nach drei
+manuellen Kreuzungswahlen einen Trefoil `T(2,3)` mit 3702 Gitterpunkten.
+Maske und Überlagerung wurden visuell geprüft. Eine manuelle Browserprüfung
+oder eine Abnahme beliebiger realer Papierscans ist damit nicht behauptet.
+Algorithmus, Bedienung, Grenzen und Abnahmebefehle:
+[Scan-Aufbereitung](scan_tracer.md).
+
+## Nächste Ausbaustufe: weitergehende Scanerkennung (weiter offen)
 
 AP-02 und AP-03 erkennen saubere rechtwinklige Diagramme mit manuell oder
 automatisch ermitteltem Raster. AP-04 ergänzt saubere freie Kurven mit
-durchgezogenen Kreuzungen. Für gescannte Vorlagen bleibt die allgemeinere
-Bildaufbereitung offen:
+durchgezogenen Kreuzungen. AP-05 ergänzt eine kontrollierbare lokale
+Helligkeitskorrektur. Die allgemeinere Bildaufbereitung bleibt offen:
 
 ```text
 Bild
@@ -466,7 +494,11 @@ Gitterpfad
 Turtle-Code
 ```
 
-Papierstrukturen, Beleuchtung, Beschriftungen, unterbrochene freie Kurven und
-deren Kreuzungslücken sowie Entzerrung sind weiterhin offen. Die Übereinstimmung
+Starke Papierstrukturen, abrupte Beleuchtungswechsel, Beschriftungen,
+unterbrochene freie Kurven und deren Kreuzungslücken sowie Entzerrung sind
+weiterhin offen. Der nächste begrenzte Schritt ist die Erkennung eindeutiger
+Kreuzungslücken in freien Kurven mit überprüfbarer lokaler Evidenz; mehrdeutige
+Lücken dürfen keine stillschweigende Verbindung oder Kreuzungswahl erzeugen.
+Die Übereinstimmung
 der erkannten beziehungsweise manuell festgelegten Projektion mit der Bildvorlage
 muss beim Abzeichnen geprüft werden.

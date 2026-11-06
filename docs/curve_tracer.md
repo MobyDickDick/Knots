@@ -4,6 +4,9 @@ Status: **umgesetzt am 05.11.2026** für saubere, durchgezogene dunkle
 Kurvendiagramme auf hellem Grund. Die Erkennung läuft im Offline-Editor ohne
 Netz oder Zusatzbibliotheken. Sie ergänzt AP-02/AP-03; gescannte Papierstrukturen
 und automatische Über-/Untererkennung bei freien Kurven bleiben offen.
+Die spätere [Scan-Aufbereitung (AP-05)](scan_tracer.md) ergänzt eine lokale
+Helligkeitskorrektur und Maskenvorschau für schwache Papiertextur; die hier
+beschriebene direkte Kurvenerkennung bleibt als eigener Modus verfügbar.
 
 ## Bedienung und Beispiel
 

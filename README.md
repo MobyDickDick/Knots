@@ -94,8 +94,15 @@ Rasterbestimmung (AP-03) ist für saubere rechtwinklige Linien umgesetzt.
 Kurven ohne vorgegebenes Raster; die Über-/Unterwahl erfolgt dabei manuell.
 `node examples/make_curve_trace.cjs` erzeugt das runde Trefoil-Beispiel mit
 Entwurf, ergänzter Annotation, Kontrollüberlagerung und Galerie in
-`examples/curve_trace/`. Gescannte Papierstrukturen und Kreuzungslücken bei
-freien Kurven bleiben offen. Verfahren und Grenzen:
+`examples/curve_trace/`. Die lokale Scan-Aufbereitung (AP-05) ergänzt eine
+Vorschau und Erkennung für ungleichmäßige Beleuchtung und schwache Papiertextur.
+„Scan-Vorschau“ zeigt die Maske mit einstellbarem Fensterradius und Mindestkontrast;
+„Scan-Kurve erkennen“ führt sie durch dieselben Graphprüfungen wie AP-04.
+`node examples/make_scan_trace.cjs` erzeugt eine simulierte Scan-Vorlage,
+Maske, Kontrollüberlagerung und Galerie in `examples/scan_trace/`.
+Über-/Unterwahlen bleiben manuell. Starke Textur, Beschriftungen,
+Kreuzungslücken und Entzerrung sind weiterhin offen. Bedienung und Grenzen:
+[docs/scan_tracer.md](docs/scan_tracer.md). Verfahren der freien Kurvenerkennung:
 [docs/curve_tracer.md](docs/curve_tracer.md).
 Format und Bedienung stehen in [docs/image_tracer.md](docs/image_tracer.md),
 Algorithmus, unterstützte Bilder und Grenzen in [docs/raster_tracer.md](docs/raster_tracer.md).
