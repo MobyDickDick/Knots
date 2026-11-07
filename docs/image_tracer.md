@@ -17,6 +17,9 @@ immer manuell ergänzt: [Freie Kurven erkennen](curve_tracer.md).
 AP-05 ergänzt eine lokale Helligkeitskorrektur mit Maskenvorschau für
 ungleichmäßige Beleuchtung und schwache Papiertextur:
 [Scan-Aufbereitung](scan_tracer.md).
+AP-06 ergänzt zwei eigene Modi für lokal belegte kurze Kreuzungslücken,
+auch zusammen mit der Scan-Aufbereitung. Nur diese Modi ergänzen Verbindungen
+und daraus bestimmte Überführungen: [Kreuzungslücken](gap_tracer.md).
 
 ## Bedienung
 

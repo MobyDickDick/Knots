@@ -100,8 +100,15 @@ Vorschau und Erkennung für ungleichmäßige Beleuchtung und schwache Papiertext
 „Scan-Kurve erkennen“ führt sie durch dieselben Graphprüfungen wie AP-04.
 `node examples/make_scan_trace.cjs` erzeugt eine simulierte Scan-Vorlage,
 Maske, Kontrollüberlagerung und Galerie in `examples/scan_trace/`.
-Über-/Unterwahlen bleiben manuell. Starke Textur, Beschriftungen,
-Kreuzungslücken und Entzerrung sind weiterhin offen. Bedienung und Grenzen:
+Über-/Unterwahlen bleiben in diesem Modus manuell. AP-06 ergänzt die Knöpfe
+„Kurve mit Kreuzungslücken erkennen“ und „Scan mit Kreuzungslücken erkennen“:
+Kurze eindeutige Unterbrechungen mit durchgezogenem querendem Strang liefern
+lokal dokumentierte Überführungen; unklare Lücken führen zum Fehler.
+`node examples/make_gap_trace.cjs` erzeugt die Vorlage, Pixelbelege, einen
+teiloffenen Entwurf und die vollständige Trefoil-Galerie in `examples/gap_trace/`.
+Bedienung und Grenzen: [docs/gap_tracer.md](docs/gap_tracer.md).
+Starke Textur, Beschriftungen, allgemeine Unterbrechungen und Entzerrung
+sind weiterhin offen. Bedienung und Grenzen der Scan-Aufbereitung:
 [docs/scan_tracer.md](docs/scan_tracer.md). Verfahren der freien Kurvenerkennung:
 [docs/curve_tracer.md](docs/curve_tracer.md).
 Format und Bedienung stehen in [docs/image_tracer.md](docs/image_tracer.md),

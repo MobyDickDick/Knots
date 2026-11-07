@@ -7,6 +7,9 @@ und automatische Über-/Untererkennung bei freien Kurven bleiben offen.
 Die spätere [Scan-Aufbereitung (AP-05)](scan_tracer.md) ergänzt eine lokale
 Helligkeitskorrektur und Maskenvorschau für schwache Papiertextur; die hier
 beschriebene direkte Kurvenerkennung bleibt als eigener Modus verfügbar.
+Die spätere [Kreuzungslückenerkennung (AP-06)](gap_tracer.md) ergänzt einen
+eigenen Modus für lokal belegte kurze Unterführungen; die folgenden Aussagen
+über offene Wahlen und fehlende Lückenschließung gelten für den AP-04-Modus.
 
 ## Bedienung und Beispiel
 

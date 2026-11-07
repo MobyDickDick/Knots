@@ -5,6 +5,9 @@ Scan-Ausbaustufe ergänzt AP-04 um eine lokale Helligkeitskorrektur und die
 Unterdrückung schwacher Papiertextur durch einen einstellbaren Mindestkontrast.
 Er verarbeitet durchgezogene dunkle Kurven auf hellerem Papier offline ohne
 Zusatzpakete. Eine allgemeine Erkennung beliebiger Scans ist weiterhin offen.
+Die spätere [Kreuzungslückenerkennung (AP-06)](gap_tracer.md) ergänzt den
+separaten Knopf „Scan mit Kreuzungslücken erkennen“. Der hier beschriebene
+AP-05-Modus schließt weiterhin keine Lücken.
 
 ## Bedienung
 

@@ -471,12 +471,46 @@ oder eine Abnahme beliebiger realer Papierscans ist damit nicht behauptet.
 Algorithmus, Bedienung, Grenzen und Abnahmebefehle:
 [Scan-Aufbereitung](scan_tracer.md).
 
+## Arbeitspaket AP-06: Eindeutige Kreuzungslücken in freien Kurven
+
+Status: **umgesetzt am 07.11.2026**. Der dokumentierte nächste begrenzte Schritt
+erkennt kurze, lokal annähernd gerade Unterführungen anhand der ursprünglichen
+Pixelmaske. Ein eigener Modus ergänzt die freie Kurvenerkennung und lässt sich
+mit der Scan-Aufbereitung kombinieren.
+
+- [x] Skelettenden endlich paaren; ausgerichtete Endarme, zwei weiße Schultern
+  und einen durchgezogenen transversalen Überstrang lokal nachweisen.
+- [x] Für jedes Ende genau einen gültigen Partner verlangen; offene, mehrdeutige,
+  nahe und fremdbelegte Fälle ohne Teilübernahme zurückweisen.
+- [x] Nur belegte Verbindungen ergänzen und die vollständige Rekonstruktion
+  durch alle AP-04-Graphprüfungen bis zum einzelnen geschlossenen Strang führen.
+- [x] Belegte Überführungen über die zyklische Armordnung in die rechtwinklige
+  Einbettung übertragen; durchgezogene Kreuzungen zur manuellen Wahl offenlassen.
+- [x] Zwei Offline-Bedienwege, Fehlererholung, gemischte Entwürfe, manuelle
+  Änderungen und verlässliches Verwerfen veralteter Berichte integrieren.
+- [x] Lokale Pixelbelege in JavaScript/Python validieren und im JSON-Roundtrip,
+  Gitter-/Turtle-Export und Galerie einschließlich Scan-Parametern erhalten.
+- [x] Reproduzierbare PNG-Vorlagen, Kontrollüberlagerung, teiloffenen Entwurf,
+  vollständige Annotation, simulierten Scan und Galerie bereitstellen.
+- [x] Echte PNG-Pixel, Drehungen, Spiegel, Händigkeit, Strichbreiten,
+  Gegenbeispiele, Grenzen, Bedienereignisse und vollständige Exporte prüfen.
+
+Abnahme: 100 Python-Tests, fünf Node-Editor-/Erkennungsprüfungen und sieben
+Galerieprüfungen erfolgreich. `node examples/make_gap_trace.cjs` erzeugt
+`examples/gap_trace/`: drei aus Pixeln belegte Überführungen, ein Trefoil
+`T(2,3)` und 3702 Gitterpunkte ohne vorgegebene manuelle Kreuzungswahl.
+Vorlage und Überlagerung wurden visuell geprüft. Keine manuelle Browserprüfung
+oder Abnahme beliebiger realer Scans. Grenzen: höchstens 20 getrennte Lücken
+mit Endabstand 10–40 Bildpixeln, ausreichend geraden Armen und eindeutigem
+querendem Überstrang. Details: [Kreuzungslücken](gap_tracer.md).
+
 ## Nächste Ausbaustufe: weitergehende Scanerkennung (weiter offen)
 
 AP-02 und AP-03 erkennen saubere rechtwinklige Diagramme mit manuell oder
 automatisch ermitteltem Raster. AP-04 ergänzt saubere freie Kurven mit
 durchgezogenen Kreuzungen. AP-05 ergänzt eine kontrollierbare lokale
-Helligkeitskorrektur. Die allgemeinere Bildaufbereitung bleibt offen:
+Helligkeitskorrektur. AP-06 ergänzt lokal belegte Kreuzungslücken.
+Die allgemeinere Bildaufbereitung bleibt offen:
 
 ```text
 Bild
@@ -495,10 +529,8 @@ Turtle-Code
 ```
 
 Starke Papierstrukturen, abrupte Beleuchtungswechsel, Beschriftungen,
-unterbrochene freie Kurven und deren Kreuzungslücken sowie Entzerrung sind
-weiterhin offen. Der nächste begrenzte Schritt ist die Erkennung eindeutiger
-Kreuzungslücken in freien Kurven mit überprüfbarer lokaler Evidenz; mehrdeutige
-Lücken dürfen keine stillschweigende Verbindung oder Kreuzungswahl erzeugen.
-Die Übereinstimmung
+allgemein unterbrochene freie Kurven, geometrisch unklare Kreuzungslücken und
+Entzerrung sind weiterhin offen. Mehrdeutige Lücken erzeugen auch nach AP-06
+keine stillschweigende Verbindung oder Kreuzungswahl. Die Übereinstimmung
 der erkannten beziehungsweise manuell festgelegten Projektion mit der Bildvorlage
 muss beim Abzeichnen geprüft werden.

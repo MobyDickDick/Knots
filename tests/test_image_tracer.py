@@ -246,6 +246,31 @@ class ImageTracerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "scan preprocessing"):
             annotation_from_dict({**record, "recognition": raster_report})
 
+    def test_crossing_gap_example_evidence_roundtrip_and_export(self):
+        record = json.loads((Path(__file__).resolve().parents[1] / "examples/gap_trace/annotation.json").read_text())
+        annotation = annotation_from_dict(record)
+        self.assertEqual(annotation_to_dict(annotation), record)
+        self.assertEqual(record["recognition"]["inferred_crossings"], 3)
+        self.assertEqual(record["recognition"]["unresolved_crossings"], 0)
+        trace = trace_annotation(annotation)
+        self.assertTrue(validate_cycle(trace.points).is_valid)
+        self.assertEqual(trace_turtle(trace.code).points, trace.points)
+        self.assertEqual(classify_knot(trace.points).name, "T(2,3)")
+        with TemporaryDirectory() as directory:
+            metadata = json.loads(write_traced_diagram(annotation, directory).read_text())
+            self.assertEqual(metadata["source"], "reviewed_gap_annotation")
+            self.assertEqual(metadata["annotation"], record)
+            self.assertIn("Kurve mit Kreuzungslücken", (Path(directory) / "index.html").read_text(encoding="utf-8"))
+        # The stored evidence describes the initial inference; manual overrides are valid.
+        found = diagram_crossings(annotation.waypoints)
+        first = record["crossings"][0]
+        first["over_segment"] = next(i for i in found[tuple(first["coordinate"])] if i != first["over_segment"])
+        self.assertEqual(annotation_to_dict(annotation_from_dict(record)), record)
+        bad = json.loads(json.dumps(record))
+        bad["recognition"]["crossing_gaps"]["evidence"][0]["added_pixels"] = True
+        with self.assertRaisesRegex(ValueError, "crossing gap"):
+            annotation_from_dict(bad)
+
     def test_vertex_budget_precedes_expansion_and_counts_layer_switches(self):
         annotation = annotate_grid_candidate(trefoil_candidate())
         size = len(trace_annotation(annotation).points) - 1

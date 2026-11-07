@@ -21,3 +21,5 @@ build/
 !examples/curve_trace/*.svg
 !examples/scan_trace/*.json
 !examples/scan_trace/*.svg
+!examples/gap_trace/*.json
+!examples/gap_trace/*.svg
