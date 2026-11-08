@@ -138,6 +138,30 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
         gap_report = None
         if "crossing_gaps" in recognition:
             gap_report = _crossing_gap_report(recognition["crossing_gaps"], recognition, view, record["waypoints"])
+        line_report = None
+        if "line_gaps" in recognition:
+            line_report = recognition["line_gaps"]
+            crossing_evidence = gap_report["evidence"] if gap_report else []
+            if (not curve or view is None or not isinstance(line_report, dict)
+                    or line_report.get("algorithm") != "local-line-gaps-v1"
+                    or not isinstance(line_report.get("evidence"), list)
+                    or len(line_report["evidence"]) + len(crossing_evidence) > 20
+                    or recognition["inferred_crossings"] + recognition["unresolved_crossings"] != len(diagram_crossings(record["waypoints"]))):
+                raise ValueError("invalid line gap report")
+            evidence, used = [], {tuple(p) for e in crossing_evidence for p in e["endpoints"]}
+            if len(used) != 2 * len(crossing_evidence):
+                raise ValueError("invalid line gap report: reused endpoints")
+            for item in line_report["evidence"]:
+                if not isinstance(item, dict) or not isinstance(item.get("endpoints"), list) or len(item["endpoints"]) != 2:
+                    raise ValueError("invalid line gap report endpoints")
+                endpoints = [_coordinate(p, "line gap endpoints") for p in item["endpoints"]]
+                if (any(not 0 <= p[0] < view["width"] or not 0 <= p[1] < view["height"] or p in used for p in endpoints)
+                        or not 100 <= sum((a-b)**2 for a, b in zip(*endpoints)) <= 1024
+                        or type(item.get("added_pixels")) is not int or not 3 <= item["added_pixels"] <= 64):
+                    raise ValueError("invalid line gap report evidence")
+                used.update(endpoints)
+                evidence.append(dict(endpoints=[list(p) for p in endpoints], added_pixels=item["added_pixels"]))
+            line_report = dict(algorithm=line_report["algorithm"], evidence=evidence)
         preprocessing = recognition.get("preprocessing")
         if "preprocessing" in recognition:
             if (not curve or not isinstance(preprocessing, dict)
@@ -167,6 +191,8 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
                                             "background_min", "background_max")}
         if gap_report is not None:
             recognition["crossing_gaps"] = gap_report
+        if line_report is not None:
+            recognition["line_gaps"] = line_report
     return DiagramAnnotation(tuple(_coordinate(p, f"waypoint {i}")
                                    for i, p in enumerate(record["waypoints"])), tuple(choices), source, view, recognition, draft)
 
@@ -322,7 +348,8 @@ def write_traced_diagram(annotation: DiagramAnnotation, directory: str | Path,
     classification = classify_knot(trace.points)
     source = "manual_image_annotation"
     if annotation.recognition:
-        source = ("reviewed_gap_annotation" if "crossing_gaps" in annotation.recognition
+        source = ("reviewed_line_gap_annotation" if "line_gaps" in annotation.recognition
+                  else "reviewed_gap_annotation" if "crossing_gaps" in annotation.recognition
                   else "reviewed_scan_annotation" if "preprocessing" in annotation.recognition
                   else "reviewed_curve_annotation" if annotation.recognition["algorithm"] == "skeleton-orthogonal-v1"
                   else "reviewed_raster_annotation")

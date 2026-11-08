@@ -504,12 +504,46 @@ oder Abnahme beliebiger realer Scans. Grenzen: höchstens 20 getrennte Lücken
 mit Endabstand 10–40 Bildpixeln, ausreichend geraden Armen und eindeutigem
 querendem Überstrang. Details: [Kreuzungslücken](gap_tracer.md).
 
+## Arbeitspaket AP-07: Kurze Linienabbrüche in freien Kurven
+
+Status: **umgesetzt am 08.11.2026**. Nach AP-06 war noch kein weiteres
+nummeriertes Arbeitspaket beschrieben. Dieses Paket konkretisiert den dort
+offenen Punkt „allgemein unterbrochene freie Kurven“ für kurze, lokal gerade,
+isolierte Linienabbrüche; beliebige unterbrochene Zeichnungen bleiben offen.
+
+- [x] Endpaare im Abstand 10–32 Pixel mit zwei unverzweigten, ausgerichteten
+  Armen und genau einer weißen Unterbrechung in der Originalmaske prüfen.
+- [x] Fremdstrukturen, nahe Kreuzungen, konkurrierende Partner und nahe Lücken
+  zurückweisen; alle ursprünglichen Enden gemeinsam eindeutig paaren.
+- [x] Nur geprüfte Mittellinien ergänzen und die vollständige Maske durch die
+  bestehenden Topologie-/Graphprüfungen bis zum einzelnen geschlossenen Strang
+  führen; keine Kreuzungswahl aus gewöhnlichen Linienabbrüchen ableiten.
+- [x] Eigene Offline-Knöpfe für Kurven und Scan-Vorlagen, rote Markierungen,
+  Ergänzungszähler und vollständige Fehlererholung ergänzen.
+- [x] Linien- und Kreuzungslücken kombinieren, getrennte Pixelberichte in
+  JavaScript/Python validieren und in JSON, Gitter-/Turtle-Export und Galerie
+  erhalten; veraltete Herkunft bei Geometrie-/Rasteränderungen verwerfen.
+- [x] Reproduzierbare PNG, Kontrollüberlagerung, vollständige Annotation,
+  teiloffenen Entwurf, simulierten Scan und Offline-Galerie bereitstellen.
+- [x] Echte PNG-Pixel, Vierteldrehungen und freie Drehung, Spiegel/Händigkeit,
+  Strichbreiten, mehrere Lücken, Gegenbeispiele, Grenzen, Bedienereignisse,
+  Klassifikation, Gittervalidierung und exakten Turtle-Roundtrip prüfen.
+
+Abnahme: 101 Python-Tests, sechs Node-Editor-/Erkennungsprüfungen und acht
+Galerieprüfungen erfolgreich. `node examples/make_line_gap_trace.cjs` erzeugt
+`examples/line_gap_trace/`: eine dokumentierte Linienergänzung, drei belegte
+Überführungen und einen Trefoil `T(2,3)` mit 3702 Gitterpunkten ohne manuelle
+Kreuzungswahl. Vorlage und Kontrollüberlagerung wurden visuell geprüft.
+Keine manuelle Browserprüfung oder Abnahme beliebiger realer Scans.
+Grenzen und Abnahmebefehle: [Linienabbrüche](line_gap_tracer.md).
+
 ## Nächste Ausbaustufe: weitergehende Scanerkennung (weiter offen)
 
 AP-02 und AP-03 erkennen saubere rechtwinklige Diagramme mit manuell oder
 automatisch ermitteltem Raster. AP-04 ergänzt saubere freie Kurven mit
 durchgezogenen Kreuzungen. AP-05 ergänzt eine kontrollierbare lokale
-Helligkeitskorrektur. AP-06 ergänzt lokal belegte Kreuzungslücken.
+Helligkeitskorrektur. AP-06 ergänzt lokal belegte Kreuzungslücken; AP-07 ergänzt
+kurze, gerade, isolierte Linienabbrüche mit dokumentierten Pixelbelegen.
 Die allgemeinere Bildaufbereitung bleibt offen:
 
 ```text
@@ -529,8 +563,8 @@ Turtle-Code
 ```
 
 Starke Papierstrukturen, abrupte Beleuchtungswechsel, Beschriftungen,
-allgemein unterbrochene freie Kurven, geometrisch unklare Kreuzungslücken und
-Entzerrung sind weiterhin offen. Mehrdeutige Lücken erzeugen auch nach AP-06
+lange oder stark gekrümmte Linienabbrüche, geometrisch unklare Kreuzungslücken und
+Entzerrung sind weiterhin offen. Mehrdeutige Lücken erzeugen auch nach AP-07
 keine stillschweigende Verbindung oder Kreuzungswahl. Die Übereinstimmung
 der erkannten beziehungsweise manuell festgelegten Projektion mit der Bildvorlage
 muss beim Abzeichnen geprüft werden.

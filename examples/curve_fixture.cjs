@@ -1,7 +1,7 @@
 // Deterministic clean curved diagrams for the example and runtime acceptance.
 // No image libraries: paint sampled parametric curves with round strokes.
 function paintCurve({kind='trefoil',width=560,height=560,scale=75,radius=3,
-  rotation=0,mirror=false,color=25,alpha=255,open=false,offset=[0,0],gapIndices=[],gapHalf=15}={}) {
+  rotation=0,mirror=false,color=25,alpha=255,open=false,offset=[0,0],gapIndices=[],gapHalf=15,lineBreaks=[],lineGapHalf=11}={}) {
   const data=new Uint8ClampedArray(width*height*4);data.fill(255);
   const samples=[];
   for(let i=0;i<=2400;i++){
@@ -13,6 +13,7 @@ function paintCurve({kind='trefoil',width=560,height=560,scale=75,radius=3,
     [x,y]=[x*Math.cos(rotation)-y*Math.sin(rotation),x*Math.sin(rotation)+y*Math.cos(rotation)];
     const p=[width/2+scale*x+offset[0],height/2+scale*y+offset[1]];samples.push(p);
     if(open&&i>80&&i<200)continue;
+    if(lineBreaks.some(angle=>Math.abs(Math.atan2(Math.sin(t-angle),Math.cos(t-angle)))<lineGapHalf/(5*scale)))continue;
     if(kind==='trefoil'&&gapIndices.some(n=>Math.abs(Math.atan2(Math.sin(t-(Math.PI/6+n*Math.PI/3)),Math.cos(t-(Math.PI/6+n*Math.PI/3))))<gapHalf/(5*scale)))continue;
     const [cx,cy]=p;
     for(let y=Math.max(0,Math.floor(cy-radius));y<=Math.min(height-1,Math.ceil(cy+radius));y++)

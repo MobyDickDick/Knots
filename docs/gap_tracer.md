@@ -4,7 +4,9 @@ Status: **umgesetzt am 07.11.2026**. Dieser begrenzte Schritt erkennt kurze,
 lokal annähernd gerade Unterbrechungen unter einem durchgezogenen querenden
 Strang. Er ergänzt die freie Kurvenerkennung (AP-04) und kann mit der lokalen
 Scan-Aufbereitung (AP-05) kombiniert werden. Alle Schritte laufen offline ohne
-Zusatzpakete. Allgemeine unterbrochene Zeichnungen bleiben offen.
+Zusatzpakete. [AP-07](line_gap_tracer.md) ergänzt einen eigenen Modus für kurze,
+gerade Linienabbrüche ohne querenden Strang. Der AP-06-Modus behält die hier
+beschriebenen Grenzen. Allgemeine unterbrochene Zeichnungen bleiben offen.
 
 ## Bedienung und Beispiel
 

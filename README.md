@@ -107,7 +107,14 @@ lokal dokumentierte Überführungen; unklare Lücken führen zum Fehler.
 `node examples/make_gap_trace.cjs` erzeugt die Vorlage, Pixelbelege, einen
 teiloffenen Entwurf und die vollständige Trefoil-Galerie in `examples/gap_trace/`.
 Bedienung und Grenzen: [docs/gap_tracer.md](docs/gap_tracer.md).
-Starke Textur, Beschriftungen, allgemeine Unterbrechungen und Entzerrung
+AP-07 ergänzt „Kurve mit Linienlücken erkennen“ und „Scan mit Linienlücken
+erkennen“ für kurze, gerade und isolierte Linienabbrüche. Ergänzungen werden
+rot markiert, im JSON dokumentiert und in der Galerie gezählt; mehrdeutige
+Fälle bleiben Fehler. `node examples/make_line_gap_trace.cjs` erzeugt die
+reproduzierbare Vorlage, Kontrollüberlagerung, Entwurf, Scan-Variante und
+Trefoil-Galerie in `examples/line_gap_trace/`.
+Bedienung, lokale Belege und Grenzen: [docs/line_gap_tracer.md](docs/line_gap_tracer.md).
+Starke Textur, Beschriftungen, beliebige Unterbrechungen und Entzerrung
 sind weiterhin offen. Bedienung und Grenzen der Scan-Aufbereitung:
 [docs/scan_tracer.md](docs/scan_tracer.md). Verfahren der freien Kurvenerkennung:
 [docs/curve_tracer.md](docs/curve_tracer.md).
