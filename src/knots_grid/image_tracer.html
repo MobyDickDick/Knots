@@ -43,6 +43,7 @@ Prüfe danach den Pfad und die Über-/Unterführung an jeder Kreuzung. Die gespe
 <div class="tools">
 <label>Scan: Fensterradius <input id="scan-radius" type="number" min="8" max="80" value="24"></label>
 <label>Mindestkontrast <input id="scan-contrast" type="number" min="5" max="100" value="30"></label>
+<label>Kleine Fremdkomponenten entfernen: bis <input id="scan-cleanup" type="number" min="0" max="64" value="0"> Pixel (0 = aus)</label>
 <button id="scan-preview" disabled>Scan-Vorschau</button>
 <button id="scan-recognize" disabled>Scan-Kurve erkennen</button>
 <button id="scan-gap-recognize" disabled>Scan mit Kreuzungslücken erkennen</button>
@@ -68,7 +69,8 @@ Prüfe danach den Pfad und die Über-/Unterführung an jeder Kreuzung. Die gespe
 <li>Für eine freie Kurve: „Freie Kurve erkennen“ skelettiert eine durchgezogene dunkle Linie und überführt ihren geprüften Graphen auf ein feines rechtwinkliges Raster. Alle Über-/Unterführungen anschließend manuell wählen. Kreuzungslücken, Berührungen, Beschriftungen und Papierstrukturen sind in diesem Modus nicht unterstützt.</li>
 <li>„Kurve mit Kreuzungslücken erkennen“ ergänzt nur kurze, gerade Unterbrechungen mit zwei ausgerichteten Enden und einem durchgezogenen querenden Strang. Die belegten Überführungen werden grün markiert; durchgezogene Kreuzungen bleiben offen. Mehrdeutige oder sonstige offene Enden führen zum Fehler. Anschließend die gesamte Vorlage und die Kreuzungswahlen prüfen.</li>
 <li>„Kurve mit Linienlücken erkennen“ und „Scan mit Linienlücken erkennen“ ergänzen zusätzlich kurze gerade Linienabbrüche ohne querenden Strang. Ergänzte Linienlücken werden rot markiert und im Bericht gespeichert. Jede Ergänzung mit dem Original vergleichen: Die lokale Ausrichtung belegt keine Zeichenabsicht. Durchgezogene Kreuzungen brauchen weiterhin eine manuelle Wahl.</li>
-<li>Für ungleichmäßig beleuchtete Vorlagen: „Scan-Vorschau“ zeigt die lokal aufgehellte Schwarzweißmaske. Radius größer als die Strichbreite wählen; Mindestkontrast unterhalb des Linienkontrasts und oberhalb schwacher Papiertextur einstellen. Original und Maske mit dem Schalter vergleichen, dann „Scan-Kurve erkennen“ wählen. Für lokal eindeutige Unterführungen stattdessen „Scan mit Kreuzungslücken erkennen“ verwenden; nur dieser Scan-Modus ergänzt belegte Verbindungen. Die Vorschau zeigt die Maske vor Ergänzungen. Die gesamte Maske und den Pfad mit der Vorlage vergleichen; Schrift, Flecken und starke Textur bleiben nicht unterstützt.</li>
+<li>Für ungleichmäßig beleuchtete Vorlagen: „Scan-Vorschau“ zeigt die lokal aufgehellte Schwarzweißmaske. Radius größer als die Strichbreite wählen; Mindestkontrast unterhalb des Linienkontrasts und oberhalb schwacher Papiertextur einstellen. Original und Maske mit dem Schalter vergleichen, dann einen Scan-Erkennungsknopf wählen. Die Varianten mit Kreuzungs- oder Linienlücken ergänzen separat geprüfte Verbindungen. Die Vorschau zeigt die Maske vor Ergänzungen. Die gesamte Maske und den Pfad mit der Vorlage vergleichen; allgemeine Schrift und starke Textur bleiben nicht unterstützt.</li>
+<li>Optional kleine isolierte Flecken im Scan entfernen: „Kleine Fremdkomponenten entfernen“ auf 1–64 schwarze Pixel stellen (0 = aus). Höchstens 32 Komponenten mit insgesamt 1024 Pixeln und mindestens zwölf Pixeln Abstand zu jeder anderen Tinte sind erlaubt. Nahe Tinte und kleine Randanschnitte führen zum Fehler. Die Scan-Vorschau markiert entfernte Stellen violett. Jede Entfernung im Vergleich mit dem Original prüfen: Auch ein gewollter kleiner Diagrammteil kann wie ein Fleck aussehen. Die Auswahl gilt für alle drei Scan-Modi; größere Fremdstrukturen bleiben erhalten.</li>
 <li>Raster einstellen und die Linie einmal der Reihe nach abklicken. Der nächste Punkt rastet horizontal oder vertikal zum vorherigen ein. Zusätzliche Ecken helfen beim Nachzeichnen runder Bögen. Den Startpunkt nicht nochmals setzen.</li>
 <li>Mit „Linie schließen“ die letzte Strecke zum Start ergänzen. Auch diese muss waagerecht oder senkrecht sein. Bei einer Fehlermeldung den letzten Punkt zurücknehmen und korrigieren.</li>
 <li>Im Modus „Kreuzungen“ auf jeden orangefarbenen Kreis klicken. Ein weiterer Klick wechselt den oberen Strang. Alle Kreuzungen müssen grün sein.</li>
@@ -208,6 +210,25 @@ const TracerModel = (() => {
             ||!integer(p.background_min)||!integer(p.background_max)||p.background_min<0||p.background_max>255||p.background_min>p.background_max)
             throw Error('Ungültiger Scan-Aufbereitungsbericht.');
           drawing.recognition.preprocessing=Object.fromEntries(['algorithm','window_radius','contrast','foreground_pixels','background_min','background_max'].map(k=>[k,p[k]]));
+          if(p.cleanup!==undefined){
+            const c=p.cleanup;
+            if(!view||!c||c.algorithm!=='isolated-components-v1'||!integer(c.max_area)||c.max_area<1||c.max_area>64||c.clearance!==12
+              ||!integer(c.original_foreground_pixels)||c.original_foreground_pixels>200000
+              ||!integer(c.removed_pixels)||c.removed_pixels<0||c.removed_pixels>1024||c.original_foreground_pixels!==p.foreground_pixels+c.removed_pixels
+              ||!Array.isArray(c.components)||c.components.length>32
+              ||c.components.some(e=>!e||!integer(e.pixels)||e.pixels<1||e.pixels>c.max_area
+                ||!Array.isArray(e.bounds)||e.bounds.length!==4||!e.bounds.every(integer)
+                ||e.bounds[0]<1||e.bounds[1]<1||e.bounds[2]>=view.width-1||e.bounds[3]>=view.height-1
+                ||e.bounds[0]>e.bounds[2]||e.bounds[1]>e.bounds[3]
+                ||e.pixels>(e.bounds[2]-e.bounds[0]+1)*(e.bounds[3]-e.bounds[1]+1)
+                ||e.pixels<Math.max(e.bounds[2]-e.bounds[0]+1,e.bounds[3]-e.bounds[1]+1))
+              ||c.components.reduce((n,e)=>n+e.pixels,0)!==c.removed_pixels
+              ||new Set(c.components.map(e=>e.bounds.join(','))).size!==c.components.length)
+              throw Error('Ungültiger Scan-Bereinigungsbericht.');
+            drawing.recognition.preprocessing.cleanup={algorithm:c.algorithm,max_area:c.max_area,clearance:12,
+              original_foreground_pixels:c.original_foreground_pixels,removed_pixels:c.removed_pixels,
+              components:c.components.map(e=>({bounds:[...e.bounds],pixels:e.pixels}))};
+          }
         }
         if(r.grid_detection!==undefined){
           const g=r.grid_detection;
@@ -387,15 +408,49 @@ const RasterTracer = (() => {
   return {recognize,recognizeAuto,pixels};
 })();
 
-// Bounded local thresholding. No denoising, gap closure or component deletion.
+// Bounded local thresholding with opt-in, isolated small-component removal.
 const ScanPreprocessor = (() => {
-  function prepare(image,{radius=24,contrast=30}={}) {
+  function clean(output,width,height,foreground,maxArea){
+    // Label 8-connected ink before changing any pixels. Small components must
+    // be isolated from ALL other ink, including other removal candidates.
+    const labels=new Int32Array(width*height),queue=new Uint32Array(foreground),small=[];let label=0;
+    for(let start=0;start<labels.length;start++){
+      if(output[4*start]!==0||labels[start])continue;
+      let head=0,tail=1,x0=width,y0=height,x1=0,y1=0;queue[0]=start;labels[start]=++label;
+      while(head<tail){
+        const i=queue[head++],x=i%width,y=Math.floor(i/width);
+        x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);
+        for(let yy=Math.max(0,y-1);yy<=Math.min(height-1,y+1);yy++)for(let xx=Math.max(0,x-1);xx<=Math.min(width-1,x+1);xx++){
+          const j=yy*width+xx;if(!labels[j]&&output[4*j]===0){labels[j]=label;queue[tail++]=j;}
+        }
+      }
+      if(tail<=maxArea){small.push({label,pixels:Array.from(queue.subarray(0,tail)),bounds:[x0,y0,x1,y1]});
+        if(small.length>32)throw Error('Scan-Bereinigung: mehr als 32 kleine Komponenten.');}
+    }
+    const removed=small.reduce((n,c)=>n+c.pixels.length,0);
+    if(removed>1024||removed===foreground)throw Error('Scan-Bereinigung: zu viele Fremdpixel oder kein verbleibender Linienzug.');
+    for(const c of small){
+      const [x0,y0,x1,y1]=c.bounds;
+      if(x0===0||y0===0||x1===width-1||y1===height-1)throw Error('Scan-Bereinigung: kleine Komponente am Bildrand.');
+      for(const i of c.pixels){
+        const x=i%width,y=Math.floor(i/width);
+        for(let yy=Math.max(0,y-11);yy<=Math.min(height-1,y+11);yy++)for(let xx=Math.max(0,x-11);xx<=Math.min(width-1,x+11);xx++){
+          const other=labels[yy*width+xx];if(other&&other!==c.label)throw Error('Scan-Bereinigung: kleine Komponente zu nah an anderer Tinte (mindestens 12 Pixel nötig).');
+        }
+      }
+    }
+    for(const c of small)for(const i of c.pixels)output.set([255,255,255,255],4*i);
+    return {algorithm:'isolated-components-v1',max_area:maxArea,clearance:12,original_foreground_pixels:foreground,
+      removed_pixels:removed,components:small.map(c=>({bounds:c.bounds,pixels:c.pixels.length}))};
+  }
+  function prepare(image,{radius=24,contrast=30,cleanup=0}={}) {
     // Validate dimensions before allocating the integral image and output mask.
     const {width,height,data}=image;
     if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1||width>1200||height>900||!data||data.length!==4*width*height)
       throw Error('Scan-Aufbereitung unterstützt höchstens 1200 × 900 Pixel.');
     if(!Number.isSafeInteger(radius)||radius<8||radius>80||!Number.isSafeInteger(contrast)||contrast<5||contrast>100)
       throw Error('Scan-Radius oder Mindestkontrast ungültig.');
+    if(!Number.isSafeInteger(cleanup)||cleanup<0||cleanup>64)throw Error('Scan-Bereinigung: Pixelgrenze muss zwischen 0 und 64 liegen.');
     const light=new Uint8Array(width*height),stride=width+1,integral=new Float64Array(stride*(height+1));
     for(let y=0;y<height;y++){
       let sum=0;
@@ -416,8 +471,9 @@ const ScanPreprocessor = (() => {
     }
     if(!foreground)throw Error('Keine kontrastreiche Linie gefunden. Scan-Mindestkontrast prüfen.');
     if(foreground>200000)throw Error('Scan-Maske überschreitet 200000 Vordergrundpixel.');
+    const cleaning=cleanup?clean(output,width,height,foreground,cleanup):null;
     return {image:{width,height,data:output},report:{algorithm:'local-mean-v1',window_radius:radius,contrast,
-      foreground_pixels:foreground,background_min:min,background_max:max}};
+      foreground_pixels:foreground-(cleaning?.removed_pixels??0),background_min:min,background_max:max,...(cleaning?{cleanup:cleaning}:{})}};
   }
   return {prepare};
 })();
@@ -938,7 +994,7 @@ const ScanTracer = {
   for(const id of ['spacing','origin-x','origin-y'])get(id).addEventListener('change',rasterChanged);
   get('show-image').addEventListener('change',render);
   get('show-scan').addEventListener('change',render);
-  for(const id of ['scan-radius','scan-contrast'])get(id).addEventListener('change',()=>{scanPreview=null;render();});
+  for(const id of ['scan-radius','scan-contrast','scan-cleanup'])get(id).addEventListener('change',()=>{scanPreview=null;render();});
   get('image').addEventListener('change',()=>{
     const file=get('image').files[0];if(!file)return;
     const request=++imageRequest, candidate=new Image(), url=URL.createObjectURL(file);
@@ -961,6 +1017,7 @@ const ScanTracer = {
       canvas.width=candidate.view?.width??Math.max(1104,width*spacing());canvas.height=candidate.view?.height??Math.max(720,height*spacing());
       ++imageRequest;image=null;scanPreview=null;if(imageUrl)URL.revokeObjectURL(imageUrl);imageUrl=null;
       if(candidate.recognition?.preprocessing){get('scan-radius').value=candidate.recognition.preprocessing.window_radius;get('scan-contrast').value=candidate.recognition.preprocessing.contrast;}
+      get('scan-cleanup').value=candidate.recognition?.preprocessing?.cleanup?.max_area??0;
       status();render();
     }catch(error){message(error.message,true);}get('import').value='';
   });
@@ -971,16 +1028,19 @@ const ScanTracer = {
     const context=raw.getContext('2d');context.drawImage(image,0,0,raw.width,raw.height);
     return context.getImageData(0,0,raw.width,raw.height);
   }
-  const scanOptions=()=>({radius:Number(get('scan-radius').value),contrast:Number(get('scan-contrast').value)});
+  const scanOptions=()=>({radius:Number(get('scan-radius').value),contrast:Number(get('scan-contrast').value),cleanup:Number(get('scan-cleanup').value)});
   function previewCanvas(prepared){
     const preview=document.createElement('canvas');preview.width=prepared.image.width;preview.height=prepared.image.height;
     const context=preview.getContext('2d'),pixels=context.createImageData(preview.width,preview.height);
-    pixels.data.set(prepared.image.data);context.putImageData(pixels,0,0);return preview;
+    pixels.data.set(prepared.image.data);context.putImageData(pixels,0,0);
+    context.strokeStyle='#c026d3';context.lineWidth=2;
+    for(const c of prepared.report.cleanup?.components??[]){const [x0,y0,x1,y1]=c.bounds;context.strokeRect(x0-3,y0-3,x1-x0+7,y1-y0+7);}
+    return preview;
   }
   get('scan-preview').addEventListener('click',()=>{
     try{const prepared=ScanPreprocessor.prepare(imagePixels(),scanOptions()),preview=previewCanvas(prepared);
       scanPreview=preview;get('show-scan').checked=true;render();
-      message(`Scan-Maske: ${prepared.report.foreground_pixels} dunkle Pixel. Mit dem Original vergleichen; anschließend „Scan-Kurve erkennen“ wählen.`);
+      message(`Scan-Maske: ${prepared.report.foreground_pixels} dunkle Pixel. ${prepared.report.cleanup?`${prepared.report.cleanup.components.length} Fremdkomponenten entfernt (violett markiert); jede Entfernung prüfen. `:''}Mit dem Original vergleichen; anschließend „Scan-Kurve erkennen“ wählen.`);
     }catch(error){message(error.message,true);}
   });
   function recognizeImage(automatic){
@@ -994,7 +1054,7 @@ const ScanTracer = {
       const candidate=TracerModel.Drawing.load(record),preview=prepared?previewCanvas(prepared):null;
       drawing=candidate;scanPreview=preview;offset=[0,0];mode='crossings';
       get('spacing').value=record.editor_view.spacing;get('origin-x').value=record.editor_view.pixel_origin[0];get('origin-y').value=record.editor_view.pixel_origin[1];
-      render();message(`${automatic?`Raster: ${spacing()} Pixel, Ursprung ${origin().join('/')}. `:''}Erkannt: ${drawing.points.length} Stützpunkte, ${drawing.choices.size} eindeutige Kreuzungswahlen, ${drawing.recognition.unresolved_crossings} offene Wahlen. ${drawing.recognition.line_gaps?`${drawing.recognition.line_gaps.evidence.length} Linienlücken ergänzt (rot); jede Ergänzung prüfen. `:''}Ergebnis mit der Vorlage vergleichen und offene Kreuzungen wählen.`);
+      render();message(`${automatic?`Raster: ${spacing()} Pixel, Ursprung ${origin().join('/')}. `:''}Erkannt: ${drawing.points.length} Stützpunkte, ${drawing.choices.size} eindeutige Kreuzungswahlen, ${drawing.recognition.unresolved_crossings} offene Wahlen. ${drawing.recognition.preprocessing?.cleanup?`${drawing.recognition.preprocessing.cleanup.components.length} Fremdkomponenten entfernt (violett in der Scan-Maske); jede Entfernung prüfen. `:''}${drawing.recognition.line_gaps?`${drawing.recognition.line_gaps.evidence.length} Linienlücken ergänzt (rot); jede Ergänzung prüfen. `:''}Ergebnis mit der Vorlage vergleichen und offene Kreuzungen wählen.`);
     }catch(error){message(error.message,true);}
   }
   get('recognize').addEventListener('click',()=>recognizeImage(false));

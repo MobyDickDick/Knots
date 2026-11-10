@@ -8,6 +8,9 @@ Zusatzpakete. Eine allgemeine Erkennung beliebiger Scans ist weiterhin offen.
 Die spätere [Kreuzungslückenerkennung (AP-06)](gap_tracer.md) ergänzt den
 separaten Knopf „Scan mit Kreuzungslücken erkennen“. Der hier beschriebene
 AP-05-Modus schließt weiterhin keine Lücken.
+Die zuschaltbare [Bereinigung kleiner Fremdkomponenten (AP-08)](cleanup_tracer.md)
+ergänzt alle Scan-Modi. Die folgenden Angaben zur unveränderten Pixelmaske
+beschreiben den Standard mit ausgeschalteter Bereinigung.
 
 ## Bedienung
 

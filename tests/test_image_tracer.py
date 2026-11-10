@@ -292,6 +292,29 @@ class ImageTracerTests(unittest.TestCase):
             with self.subTest(patch=patch), self.assertRaisesRegex(ValueError, "line gap"):
                 annotation_from_dict(bad)
 
+    def test_cleanup_example_roundtrip_export_and_invalid_evidence(self):
+        record = json.loads((Path(__file__).resolve().parents[1] / "examples/cleanup_trace/annotation.json").read_text())
+        annotation = annotation_from_dict(record)
+        self.assertEqual(annotation_to_dict(annotation), record)
+        cleanup = record["recognition"]["preprocessing"]["cleanup"]
+        self.assertEqual(cleanup["removed_pixels"], 27)
+        self.assertEqual(len(cleanup["components"]), 3)
+        trace = trace_annotation(annotation)
+        self.assertTrue(validate_cycle(trace.points).is_valid)
+        self.assertEqual(trace_turtle(trace.code).points, trace.points)
+        self.assertEqual(classify_knot(trace.points).name, "T(2,3)")
+        with TemporaryDirectory() as directory:
+            metadata = json.loads(write_traced_diagram(annotation, directory).read_text())
+            self.assertEqual(metadata["source"], "reviewed_scan_annotation")
+            self.assertEqual(metadata["annotation"], record)
+            self.assertIn("Entfernte Fremdkomponenten", (Path(directory) / "index.html").read_text(encoding="utf-8"))
+        for patch in ({"max_area": True}, {"removed_pixels": 28}, {"clearance": 11}, {"components": None},
+                      {"original_foreground_pixels": 200001}):
+            bad = json.loads(json.dumps(record))
+            bad["recognition"]["preprocessing"]["cleanup"].update(patch)
+            with self.subTest(patch=patch), self.assertRaisesRegex(ValueError, "scan cleanup"):
+                annotation_from_dict(bad)
+
     def test_vertex_budget_precedes_expansion_and_counts_layer_switches(self):
         annotation = annotate_grid_candidate(trefoil_candidate())
         size = len(trace_annotation(annotation).points) - 1

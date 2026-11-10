@@ -53,6 +53,35 @@ def _coordinate(value, label):
     return tuple(value)
 
 
+def _cleanup_report(report, preprocessing, view):
+    """Validate component accounting; replaying pixel isolation needs the image."""
+    if (view is None or not isinstance(report, dict) or report.get("algorithm") != "isolated-components-v1"
+            or type(report.get("max_area")) is not int or not 1 <= report["max_area"] <= 64
+            or type(report.get("clearance")) is not int or report["clearance"] != 12
+            or type(report.get("original_foreground_pixels")) is not int or report["original_foreground_pixels"] > 200_000
+            or type(report.get("removed_pixels")) is not int or not 0 <= report["removed_pixels"] <= 1024
+            or report["original_foreground_pixels"] != preprocessing["foreground_pixels"] + report["removed_pixels"]
+            or not isinstance(report.get("components"), list) or len(report["components"]) > 32):
+        raise ValueError("invalid scan cleanup report")
+    components, seen = [], set()
+    for item in report["components"]:
+        if (not isinstance(item, dict) or type(item.get("pixels")) is not int or not 1 <= item["pixels"] <= report["max_area"]
+                or not isinstance(item.get("bounds"), list) or len(item["bounds"]) != 4
+                or any(type(v) is not int for v in item["bounds"])):
+            raise ValueError("invalid scan cleanup report component")
+        x0, y0, x1, y1 = item["bounds"]
+        if (not 1 <= x0 <= x1 < view["width"] - 1 or not 1 <= y0 <= y1 < view["height"] - 1
+                or not max(x1-x0+1, y1-y0+1) <= item["pixels"] <= (x1-x0+1)*(y1-y0+1)
+                or tuple(item["bounds"]) in seen):
+            raise ValueError("invalid scan cleanup report bounds")
+        seen.add(tuple(item["bounds"]))
+        components.append(dict(bounds=list(item["bounds"]), pixels=item["pixels"]))
+    if sum(c["pixels"] for c in components) != report["removed_pixels"]:
+        raise ValueError("invalid scan cleanup report count")
+    return {**{k: report[k] for k in ("algorithm", "max_area", "clearance", "original_foreground_pixels", "removed_pixels")},
+            "components": components}
+
+
 def _crossing_gap_report(report, recognition, view, waypoints):
     """Validate stored local evidence; pixel rechecking requires the source image."""
     if (recognition["algorithm"] != "skeleton-orthogonal-v1" or not isinstance(report, dict)
@@ -163,6 +192,7 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
                 evidence.append(dict(endpoints=[list(p) for p in endpoints], added_pixels=item["added_pixels"]))
             line_report = dict(algorithm=line_report["algorithm"], evidence=evidence)
         preprocessing = recognition.get("preprocessing")
+        cleanup = None
         if "preprocessing" in recognition:
             if (not curve or not isinstance(preprocessing, dict)
                     or preprocessing.get("algorithm") != "local-mean-v1"
@@ -174,6 +204,8 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
                     or any(type(preprocessing.get(k)) is not int for k in ("background_min", "background_max"))
                     or not 0 <= preprocessing["background_min"] <= preprocessing["background_max"] <= 255):
                 raise ValueError("invalid scan preprocessing report")
+            if "cleanup" in preprocessing:
+                cleanup = _cleanup_report(preprocessing["cleanup"], preprocessing, view)
         grid = recognition.get("grid_detection")
         if "grid_detection" in recognition:
             if (not isinstance(grid, dict) or grid.get("algorithm") != "line-bands-v1"
@@ -189,6 +221,8 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
             recognition["preprocessing"] = {k: preprocessing[k] for k in
                                            ("algorithm", "window_radius", "contrast", "foreground_pixels",
                                             "background_min", "background_max")}
+            if cleanup is not None:
+                recognition["preprocessing"]["cleanup"] = cleanup
         if gap_report is not None:
             recognition["crossing_gaps"] = gap_report
         if line_report is not None:

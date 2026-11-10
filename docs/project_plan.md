@@ -537,6 +537,44 @@ Kreuzungswahl. Vorlage und Kontrollüberlagerung wurden visuell geprüft.
 Keine manuelle Browserprüfung oder Abnahme beliebiger realer Scans.
 Grenzen und Abnahmebefehle: [Linienabbrüche](line_gap_tracer.md).
 
+## Arbeitspaket AP-08: Kleine isolierte Fremdkomponenten in Scans
+
+Status: **umgesetzt am 10.11.2026**. Nach AP-07 war kein weiteres nummeriertes
+Paket festgelegt. AP-08 konkretisiert den dokumentierten offenen Bereich
+„Beschriftungen und starke Papierstrukturen“ für kleine, klar getrennte
+Tintenflecken und einzelne kleine Zeichen. Eine allgemeine Schrift- oder
+Papierstrukturerkennung bleibt offen.
+
+- [x] Standardmäßig ausgeschaltete Bereinigung nach der lokalen
+  Helligkeitskorrektur; 8er-Komponenten vollständig und deterministisch erfassen.
+- [x] Maximal 64 Pixel je Komponente, 32 Komponenten und insgesamt 1024
+  entfernte Pixel zulassen; mindestens eine größere Komponente erhalten.
+- [x] Mindestens zwölf Pixel Abstand zu jeder anderen Tinte einschließlich
+  anderer Entfernungskandidaten prüfen; kleine Randanschnitte und nahe
+  Fragmente ohne Teilübernahme zurückweisen.
+- [x] Alle Scan-Modi einschließlich beider Lückenarten anbinden und die
+  bereinigte Maske durch sämtliche bestehenden Graph-/Einbettungsprüfungen führen.
+- [x] Violett markierte Vorschau, Entfernungszähler, Parameterwiederherstellung
+  und vollständige Fehlererholung im Offline-Editor ergänzen.
+- [x] Pixelbilanz und Komponentenrechtecke in JavaScript/Python validieren,
+  im JSON-Roundtrip und Gitter-/Turtle-/Galerieexport erhalten; veraltete
+  Herkunft bei Geometrie-/Rasteränderungen verwerfen.
+- [x] Reproduzierbare Scan-PNG, Maske, Kontrollüberlagerung, Entwurf,
+  ergänzte Annotation und Offline-Galerie bereitstellen.
+- [x] Echte PNG-Pixel, Drehungen, Spiegelung, Strichbreiten, Transparenz,
+  Kombinationsmodi, Abstands-/Größen-/Anzahlgrenzen, Gegenbeispiele,
+  Editor-Ereignisse, Klassifikation und exakten Turtle-Roundtrip prüfen.
+
+Abnahme: 102 Python-Tests, sieben Node-Editor-/Erkennungsprüfungen und neun
+Galerieprüfungen erfolgreich. `node examples/make_cleanup_trace.cjs` erzeugt
+`examples/cleanup_trace/`: drei entfernte Komponenten mit insgesamt 27 Pixeln,
+eine pixelgenau zur sauberen Referenz passende Maske und nach drei manuellen
+Kreuzungswahlen einen Trefoil `T(2,3)` mit 3702 Gitterpunkten.
+Maske und Kontrollüberlagerung wurden visuell geprüft. Keine manuelle
+Browserprüfung oder Abnahme beliebiger realer Scans. Die Bereinigung belegt
+keine Zeichenabsicht; jede Entfernung ist mit dem Original zu vergleichen.
+Bedienung, Bericht und Grenzen: [Fremdkomponenten](cleanup_tracer.md).
+
 ## Nächste Ausbaustufe: weitergehende Scanerkennung (weiter offen)
 
 AP-02 und AP-03 erkennen saubere rechtwinklige Diagramme mit manuell oder
@@ -544,6 +582,8 @@ automatisch ermitteltem Raster. AP-04 ergänzt saubere freie Kurven mit
 durchgezogenen Kreuzungen. AP-05 ergänzt eine kontrollierbare lokale
 Helligkeitskorrektur. AP-06 ergänzt lokal belegte Kreuzungslücken; AP-07 ergänzt
 kurze, gerade, isolierte Linienabbrüche mit dokumentierten Pixelbelegen.
+AP-08 ergänzt die explizit zuschaltbare Entfernung kleiner isolierter
+Fremdkomponenten mit Pixelbilanz und markierter Vorschau.
 Die allgemeinere Bildaufbereitung bleibt offen:
 
 ```text
@@ -562,7 +602,7 @@ Gitterpfad
 Turtle-Code
 ```
 
-Starke Papierstrukturen, abrupte Beleuchtungswechsel, Beschriftungen,
+Starke Papierstrukturen, abrupte Beleuchtungswechsel, allgemeine Beschriftungen,
 lange oder stark gekrümmte Linienabbrüche, geometrisch unklare Kreuzungslücken und
 Entzerrung sind weiterhin offen. Mehrdeutige Lücken erzeugen auch nach AP-07
 keine stillschweigende Verbindung oder Kreuzungswahl. Die Übereinstimmung

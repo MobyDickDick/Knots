@@ -114,8 +114,15 @@ Fälle bleiben Fehler. `node examples/make_line_gap_trace.cjs` erzeugt die
 reproduzierbare Vorlage, Kontrollüberlagerung, Entwurf, Scan-Variante und
 Trefoil-Galerie in `examples/line_gap_trace/`.
 Bedienung, lokale Belege und Grenzen: [docs/line_gap_tracer.md](docs/line_gap_tracer.md).
+AP-08 ergänzt eine standardmäßig ausgeschaltete Scan-Bereinigung für kleine,
+isolierte Fremdkomponenten. „Kleine Fremdkomponenten entfernen“ begrenzt ihre
+Pixelzahl; die Scan-Vorschau markiert Entfernungen violett. Nahe Tinte und
+Randanschnitte werden zurückgewiesen, alle Entfernungen im JSON dokumentiert.
+`node examples/make_cleanup_trace.cjs` erzeugt Vorlage, Maske, Kontrollüberlagerung,
+Entwurf, ergänzte Annotation und Galerie in `examples/cleanup_trace/`.
+Bedienung und Grenzen: [docs/cleanup_tracer.md](docs/cleanup_tracer.md).
 Starke Textur, Beschriftungen, beliebige Unterbrechungen und Entzerrung
-sind weiterhin offen. Bedienung und Grenzen der Scan-Aufbereitung:
+bleiben allgemein offen. Bedienung und Grenzen der Scan-Aufbereitung:
 [docs/scan_tracer.md](docs/scan_tracer.md). Verfahren der freien Kurvenerkennung:
 [docs/curve_tracer.md](docs/curve_tracer.md).
 Format und Bedienung stehen in [docs/image_tracer.md](docs/image_tracer.md),
