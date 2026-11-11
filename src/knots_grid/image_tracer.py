@@ -201,8 +201,11 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
         cleanup = None
         if "preprocessing" in recognition:
             if (not curve or not isinstance(preprocessing, dict)
-                    or preprocessing.get("algorithm") != "local-mean-v1"
+                    or preprocessing.get("algorithm") not in ("local-mean-v1", "local-quadrant-v1")
                     or type(preprocessing.get("window_radius")) is not int or not 8 <= preprocessing["window_radius"] <= 80
+                    or (preprocessing["algorithm"] == "local-quadrant-v1"
+                        and (view is None or not 2 * preprocessing["window_radius"] + 1 <= view["width"] <= 1200
+                             or not 2 * preprocessing["window_radius"] + 1 <= view["height"] <= 900))
                     or type(preprocessing.get("contrast")) is not int or not 5 <= preprocessing["contrast"] <= 100
                     or type(preprocessing.get("foreground_pixels")) is not int
                     or not 1 <= preprocessing["foreground_pixels"] <= 200_000

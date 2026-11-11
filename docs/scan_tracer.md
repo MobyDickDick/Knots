@@ -11,6 +11,9 @@ AP-05-Modus schließt weiterhin keine Lücken.
 Die zuschaltbare [Bereinigung kleiner Fremdkomponenten (AP-08)](cleanup_tracer.md)
 ergänzt alle Scan-Modi. Die folgenden Angaben zur unveränderten Pixelmaske
 beschreiben den Standard mit ausgeschalteter Bereinigung.
+Die ebenfalls standardmäßig ausgeschaltete [Schattenkorrektur (AP-10)](shadow_tracer.md)
+ergänzt ein eigenes Verfahren für einzelne abrupte achsenparallele Schattenkanten.
+Die folgenden Angaben zum lokalen Mittelwert beschreiben den bisherigen Standard.
 
 ## Bedienung
 

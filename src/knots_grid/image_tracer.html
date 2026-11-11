@@ -44,6 +44,7 @@ Prüfe danach den Pfad und die Über-/Unterführung an jeder Kreuzung. Die gespe
 <div class="tools">
 <label>Scan: Fensterradius <input id="scan-radius" type="number" min="8" max="80" value="24"></label>
 <label>Mindestkontrast <input id="scan-contrast" type="number" min="5" max="100" value="30"></label>
+<label><input id="scan-directional" type="checkbox"> Abrupte Schattenkanten berücksichtigen</label>
 <label>Kleine Fremdkomponenten entfernen: bis <input id="scan-cleanup" type="number" min="0" max="64" value="0"> Pixel (0 = aus)</label>
 <button id="scan-preview" disabled>Scan-Vorschau</button>
 <button id="scan-recognize" disabled>Scan-Kurve erkennen</button>
@@ -206,8 +207,9 @@ const TracerModel = (() => {
         }
         if(r.preprocessing!==undefined){
           const p=r.preprocessing;
-          if(r.algorithm!=='skeleton-orthogonal-v1'||!p||p.algorithm!=='local-mean-v1'
+          if(r.algorithm!=='skeleton-orthogonal-v1'||!p||!['local-mean-v1','local-quadrant-v1'].includes(p.algorithm)
             ||!integer(p.window_radius)||p.window_radius<8||p.window_radius>80
+            ||(p.algorithm==='local-quadrant-v1'&&(!view||view.width<2*p.window_radius+1||view.height<2*p.window_radius+1||view.width>1200||view.height>900))
             ||!integer(p.contrast)||p.contrast<5||p.contrast>100
             ||!integer(p.foreground_pixels)||p.foreground_pixels<1||p.foreground_pixels>200000||p.foreground_pixels!==r.foreground_pixels
             ||!integer(p.background_min)||!integer(p.background_max)||p.background_min<0||p.background_max>255||p.background_min>p.background_max)
@@ -446,7 +448,7 @@ const ScanPreprocessor = (() => {
     return {algorithm:'isolated-components-v1',max_area:maxArea,clearance:12,original_foreground_pixels:foreground,
       removed_pixels:removed,components:small.map(c=>({bounds:c.bounds,pixels:c.pixels.length}))};
   }
-  function prepare(image,{radius=24,contrast=30,cleanup=0}={}) {
+  function prepare(image,{radius=24,contrast=30,cleanup=0,directional=false}={}) {
     // Validate dimensions before allocating the integral image and output mask.
     const {width,height,data}=image;
     if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1||width>1200||height>900||!data||data.length!==4*width*height)
@@ -454,6 +456,8 @@ const ScanPreprocessor = (() => {
     if(!Number.isSafeInteger(radius)||radius<8||radius>80||!Number.isSafeInteger(contrast)||contrast<5||contrast>100)
       throw Error('Scan-Radius oder Mindestkontrast ungültig.');
     if(!Number.isSafeInteger(cleanup)||cleanup<0||cleanup>64)throw Error('Scan-Bereinigung: Pixelgrenze muss zwischen 0 und 64 liegen.');
+    if(typeof directional!=='boolean')throw Error('Scan-Schattenkorrektur: Schalter ungültig.');
+    if(directional&&(width<2*radius+1||height<2*radius+1))throw Error('Scan-Schattenkorrektur: Bild muss je Achse mindestens 2 × Radius + 1 Pixel groß sein.');
     const light=new Uint8Array(width*height),stride=width+1,integral=new Float64Array(stride*(height+1));
     for(let y=0;y<height;y++){
       let sum=0;
@@ -464,9 +468,19 @@ const ScanPreprocessor = (() => {
       }
     }
     const output=new Uint8ClampedArray(data.length);let foreground=0,min=255,max=0;
+    const average=(x0,y0,x1,y1)=>(integral[y1*stride+x1]-integral[y0*stride+x1]-integral[y1*stride+x0]+integral[y0*stride+x0])/((x1-x0)*(y1-y0));
     for(let y=0;y<height;y++)for(let x=0;x<width;x++){
       const x0=Math.max(0,x-radius),x1=Math.min(width,x+radius+1),y0=Math.max(0,y-radius),y1=Math.min(height,y+radius+1);
-      const mean=(integral[y1*stride+x1]-integral[y0*stride+x1]-integral[y1*stride+x0]+integral[y0*stride+x0])/((x1-x0)*(y1-y0));
+      let mean;
+      if(directional){
+        // Only full quadrants: a clipped one-pixel window could erase border ink.
+        // Taking the darkest context avoids treating the dark side of a shadow as ink.
+        mean=255;
+        if(x>=radius&&y>=radius)mean=Math.min(mean,average(x-radius,y-radius,x+1,y+1));
+        if(x+radius<width&&y>=radius)mean=Math.min(mean,average(x,y-radius,x+radius+1,y+1));
+        if(x>=radius&&y+radius<height)mean=Math.min(mean,average(x-radius,y,x+1,y+radius+1));
+        if(x+radius<width&&y+radius<height)mean=Math.min(mean,average(x,y,x+radius+1,y+radius+1));
+      }else mean=average(x0,y0,x1,y1);
       min=Math.min(min,Math.round(mean));max=Math.max(max,Math.round(mean));
       const i=y*width+x,dark=mean-light[i]>=contrast,value=dark?0:255;
       if(dark)foreground++;
@@ -475,7 +489,7 @@ const ScanPreprocessor = (() => {
     if(!foreground)throw Error('Keine kontrastreiche Linie gefunden. Scan-Mindestkontrast prüfen.');
     if(foreground>200000)throw Error('Scan-Maske überschreitet 200000 Vordergrundpixel.');
     const cleaning=cleanup?clean(output,width,height,foreground,cleanup):null;
-    return {image:{width,height,data:output},report:{algorithm:'local-mean-v1',window_radius:radius,contrast,
+    return {image:{width,height,data:output},report:{algorithm:directional?'local-quadrant-v1':'local-mean-v1',window_radius:radius,contrast,
       foreground_pixels:foreground-(cleaning?.removed_pixels??0),background_min:min,background_max:max,...(cleaning?{cleanup:cleaning}:{})}};
   }
   return {prepare};
@@ -1003,7 +1017,7 @@ const ScanTracer = {
   for(const id of ['spacing','origin-x','origin-y'])get(id).addEventListener('change',rasterChanged);
   get('show-image').addEventListener('change',render);
   get('show-scan').addEventListener('change',render);
-  for(const id of ['scan-radius','scan-contrast','scan-cleanup'])get(id).addEventListener('change',()=>{scanPreview=null;render();});
+  for(const id of ['scan-radius','scan-contrast','scan-cleanup','scan-directional'])get(id).addEventListener('change',()=>{scanPreview=null;render();});
   get('image').addEventListener('change',()=>{
     const file=get('image').files[0];if(!file)return;
     const request=++imageRequest, candidate=new Image(), url=URL.createObjectURL(file);
@@ -1027,6 +1041,7 @@ const ScanTracer = {
       ++imageRequest;image=null;scanPreview=null;if(imageUrl)URL.revokeObjectURL(imageUrl);imageUrl=null;
       if(candidate.recognition?.preprocessing){get('scan-radius').value=candidate.recognition.preprocessing.window_radius;get('scan-contrast').value=candidate.recognition.preprocessing.contrast;}
       get('scan-cleanup').value=candidate.recognition?.preprocessing?.cleanup?.max_area??0;
+      get('scan-directional').checked=candidate.recognition?.preprocessing?.algorithm==='local-quadrant-v1';
       get('long-line-gaps').checked=candidate.recognition?.line_gaps?.algorithm==='local-line-gaps-v2';
       status();render();
     }catch(error){message(error.message,true);}get('import').value='';
@@ -1038,7 +1053,7 @@ const ScanTracer = {
     const context=raw.getContext('2d');context.drawImage(image,0,0,raw.width,raw.height);
     return context.getImageData(0,0,raw.width,raw.height);
   }
-  const scanOptions=()=>({radius:Number(get('scan-radius').value),contrast:Number(get('scan-contrast').value),cleanup:Number(get('scan-cleanup').value)});
+  const scanOptions=()=>({radius:Number(get('scan-radius').value),contrast:Number(get('scan-contrast').value),cleanup:Number(get('scan-cleanup').value),directional:get('scan-directional').checked});
   function previewCanvas(prepared){
     const preview=document.createElement('canvas');preview.width=prepared.image.width;preview.height=prepared.image.height;
     const context=preview.getContext('2d'),pixels=context.createImageData(preview.width,preview.height);

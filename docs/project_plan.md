@@ -607,6 +607,41 @@ Galerieprüfungen erfolgreich. Keine manuelle Browserprüfung oder Abnahme
 beliebiger realer Scans. Bedienung, Bericht und Grenzen:
 [Längere Linienabbrüche](long_line_gap_tracer.md).
 
+## Arbeitspaket AP-10: Abrupte achsenparallele Schattenkanten
+
+Status: **umgesetzt am 11.11.2026**. Nach AP-09 war kein weiteres nummeriertes Paket
+festgelegt. AP-10 konkretisiert den dokumentierten offenen Punkt „abrupte
+Beleuchtungswechsel“ für einzelne senkrechte oder waagrechte Schattenkanten
+bei ausreichend dünner, kontrastreicher Tinte.
+
+- [x] Explizite, standardmäßig ausgeschaltete Hintergrundschätzung aus dem
+  dunkelsten vollständigen Quadrantenmittelwert pro Pixel; lineare Laufzeit,
+  unveränderte Eingabe und endliche Bild-/Parameterbudgets beibehalten.
+- [x] Scan-Vorschau und alle drei Scan-Modi einschließlich Bereinigung,
+  Kreuzungs- und längerer Linienlücken anbinden; Fehlererholung und
+  Parameterwiederherstellung erhalten.
+- [x] Eigenen Bericht `local-quadrant-v1` in JavaScript/Python validieren,
+  JSON-Roundtrip, Gitter-/Turtle-/Galerieexport und Altdaten unterstützen;
+  Verfahren in der Galerie ausweisen und veraltete Herkunft verwerfen.
+- [x] Reproduzierbare Schatten-PNG, pixelgenaue Maske, Kontrollüberlagerung,
+  teiloffenen Entwurf, ergänzte Annotation und Offline-Galerie bereitstellen.
+- [x] Echte PNG-Pixel, Schattenpositionen, Drehungen, Spiegel/Händigkeit,
+  Strichbreiten, Transparenz, Kombinationsmodi, Gegenbeispiele, Grenzen,
+  Editor-Ereignisse und exakten Turtle-Roundtrip abschließend prüfen.
+
+`node examples/make_shadow_trace.cjs` erzeugt `examples/shadow_trace/`:
+eine zur sauberen Referenz pixelgleiche Maske und nach drei ausdrücklich
+gesetzten Kreuzungswahlen einen Trefoil `T(2,3)` mit 3702 Gitterpunkten.
+Maske und Kontrollüberlagerung wurden visuell geprüft. Keine manuelle
+Browserprüfung oder Abnahme beliebiger realer Scans. Bedienung, Bericht und
+Grenzen: [Schattenkanten](shadow_tracer.md).
+
+Abnahme: 104 Python-Tests, neun Node-Editor-/Erkennungsprüfungen und elf
+Galerieprüfungen erfolgreich. Die Sichtprüfung bezieht sich auf exportierte
+Maske und Überlagerung; keine manuelle Browserprüfung oder allgemeine Abnahme
+realer Papierscans. Sehr dunkle oder schräge Schatten und breite oder schwache
+Linien bleiben begrenzende Gegenbeispiele.
+
 ## Nächste Ausbaustufe: weitergehende Scanerkennung (weiter offen)
 
 AP-02 und AP-03 erkennen saubere rechtwinklige Diagramme mit manuell oder
@@ -618,6 +653,8 @@ AP-08 ergänzt die explizit zuschaltbare Entfernung kleiner isolierter
 Fremdkomponenten mit Pixelbilanz und markierter Vorschau.
 AP-09 erweitert gerade Linienabbrüche ausdrücklich zuschaltbar auf 64 Pixel
 Endabstand, mit längeren Armbelegen und größerem Freiraum.
+AP-10 ergänzt eine zuschaltbare gerichtete Hintergrundschätzung für einzelne
+achsenparallele abrupte Schattenkanten bei ausreichend kontrastreicher Tinte.
 Die allgemeinere Bildaufbereitung bleibt offen:
 
 ```text
@@ -636,7 +673,7 @@ Gitterpfad
 Turtle-Code
 ```
 
-Starke Papierstrukturen, abrupte Beleuchtungswechsel, allgemeine Beschriftungen,
+Starke Papierstrukturen, allgemeine abrupte Beleuchtungswechsel, allgemeine Beschriftungen,
 beliebig lange oder stark gekrümmte Linienabbrüche, geometrisch unklare Kreuzungslücken und
 Entzerrung sind weiterhin offen. Mehrdeutige Lücken erzeugen auch nach AP-07
 keine stillschweigende Verbindung oder Kreuzungswahl. Die Übereinstimmung

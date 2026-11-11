@@ -217,7 +217,7 @@ button:focus-visible,input:focus-visible,canvas:focus-visible { outline:3px soli
         }
         if(m.annotation.recognition?.preprocessing){
           const p=m.annotation.recognition.preprocessing;
-          values.push(['Scan-Radius',p.window_radius],['Mindestkontrast',p.contrast]);
+          values.push(['Scan-Verfahren',p.algorithm==='local-quadrant-v1'?'Gerichtete Schattenkorrektur':'Lokaler Mittelwert'],['Scan-Radius',p.window_radius],['Mindestkontrast',p.contrast]);
           if(p.cleanup)values.push(['Entfernte Fremdkomponenten',p.cleanup.components.length],['Entfernte Pixel',p.cleanup.removed_pixels],['Komponentengrenze',p.cleanup.max_area]);
         }
       } else {

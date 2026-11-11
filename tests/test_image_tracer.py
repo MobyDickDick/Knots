@@ -246,6 +246,31 @@ class ImageTracerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "scan preprocessing"):
             annotation_from_dict({**record, "recognition": raster_report})
 
+    def test_shadow_example_roundtrip_export_and_report_validation(self):
+        record = json.loads((Path(__file__).resolve().parents[1] / "examples/shadow_trace/annotation.json").read_text())
+        annotation = annotation_from_dict(record)
+        self.assertEqual(annotation_to_dict(annotation), record)
+        self.assertEqual(record["recognition"]["preprocessing"]["algorithm"], "local-quadrant-v1")
+        trace = trace_annotation(annotation)
+        self.assertTrue(validate_cycle(trace.points).is_valid)
+        self.assertEqual(trace_turtle(trace.code).points, trace.points)
+        self.assertEqual(classify_knot(trace.points).name, "T(2,3)")
+        with TemporaryDirectory() as directory:
+            metadata = json.loads(write_traced_diagram(annotation, directory).read_text())
+            self.assertEqual(metadata["annotation"], record)
+            self.assertEqual(metadata["source"], "reviewed_scan_annotation")
+            self.assertIn("Gerichtete Schattenkorrektur", (Path(directory) / "index.html").read_text(encoding="utf-8"))
+        for patch in ({"editor_view": None}, {"editor_view": {**record["editor_view"], "width": 48}},
+                      {"editor_view": {**record["editor_view"], "height": 901}}):
+            with self.subTest(patch=patch), self.assertRaisesRegex(ValueError, "scan preprocessing"):
+                annotation_from_dict({**record, **patch})
+        preprocessing = record["recognition"]["preprocessing"]
+        for key, value in (("algorithm", []), ("window_radius", True), ("contrast", 0),
+                           ("foreground_pixels", 0), ("background_min", 256)):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "scan preprocessing"):
+                annotation_from_dict({**record, "recognition": {**record["recognition"],
+                    "preprocessing": {**preprocessing, key: value}}})
+
     def test_crossing_gap_example_evidence_roundtrip_and_export(self):
         record = json.loads((Path(__file__).resolve().parents[1] / "examples/gap_trace/annotation.json").read_text())
         annotation = annotation_from_dict(record)

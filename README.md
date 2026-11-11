@@ -129,6 +129,14 @@ Galerie zeigt sie an. `node examples/make_long_line_gap_trace.cjs` erzeugt
 Vorlage, Kontrollüberlagerung, Entwurf, Scan-Variante und Trefoil-Galerie in
 `examples/long_line_gap_trace/`. Bedienung, Pixelprüfungen und Grenzen:
 [docs/long_line_gap_tracer.md](docs/long_line_gap_tracer.md).
+AP-10 ergänzt die standardmäßig ausgeschaltete Option „Abrupte Schattenkanten
+berücksichtigen“ für alle Scan-Modi. Die gerichtete Hintergrundschätzung
+unterstützt einzelne senkrechte oder waagrechte Schattenkanten bei ausreichend
+dünner, kontrastreicher Tinte. Vorschau und Herkunftsbericht erhalten das
+gewählte Verfahren. `node examples/make_shadow_trace.cjs` erzeugt Vorlage,
+pixelgenaue Maske, Kontrollüberlagerung, Entwurf und ergänzte Trefoil-Galerie in
+`examples/shadow_trace/`. Bedienung und Grenzen:
+[docs/shadow_tracer.md](docs/shadow_tracer.md).
 Starke Textur, Beschriftungen, beliebige Unterbrechungen und Entzerrung
 bleiben allgemein offen. Bedienung und Grenzen der Scan-Aufbereitung:
 [docs/scan_tracer.md](docs/scan_tracer.md). Verfahren der freien Kurvenerkennung:

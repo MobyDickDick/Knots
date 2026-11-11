@@ -98,6 +98,10 @@ assert.equal(elements['mode-3d'].attributes['aria-pressed'], 'true');
 
 const initial = snapshot();
 const selectedKnot=knots[knots.length>1?1:0];
+if(selectedKnot.metadata?.annotation?.recognition?.preprocessing?.algorithm==='local-quadrant-v1') {
+  assert.ok(elements.details.children.some(child=>child.children.some(item=>item.textContent===' Scan-Verfahren')));
+  assert.ok(elements.details.children.some(child=>child.children.some(item=>item.textContent==='Gerichtete Schattenkorrektur')));
+}
 if(['manual_image_annotation','reviewed_raster_annotation','reviewed_curve_annotation','reviewed_scan_annotation'].includes(selectedKnot.metadata?.source)) {
   assert.equal(elements['version-control'].hidden,true);
   assert.equal(elements['classification-evidence'].hidden,false);
