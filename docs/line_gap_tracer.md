@@ -46,6 +46,11 @@ Kreuzungswahl einen Trefoil `T(2,3)` mit Determinante 3, 144 Stützpunkten und
 Lückenarten. `lineGaps: true` allein ergänzt nur gewöhnliche Linienabbrüche.
 Die vorhandenen Modi behalten ihre bisherigen Grenzen.
 
+Die standardmäßig ausgeschaltete Erweiterung [AP-09](long_line_gap_tracer.md)
+erlaubt mit `maxLineGap:64` längere gerade Linienabbrüche unter strengeren
+Arm- und Freiraumprüfungen. Ohne diese Option bleiben Regeln und Berichte
+von AP-07 unverändert.
+
 - Die unveränderte Maske wird skelettiert; höchstens 40 Enden werden gemeinsam
   geprüft. Jedes Ende braucht genau einen gültigen Partner. Es gibt keine
   Auswahl nach dem nächsten Nachbarn und keine Suche alternativer Paarungen.

@@ -38,6 +38,7 @@ Prüfe danach den Pfad und die Über-/Unterführung an jeder Kreuzung. Die gespe
 <button id="curve-recognize" disabled>Freie Kurve erkennen</button>
 <button id="gap-recognize" disabled>Kurve mit Kreuzungslücken erkennen</button>
 <button id="line-gap-recognize" disabled>Kurve mit Linienlücken erkennen</button>
+<label><input id="long-line-gaps" type="checkbox"> Längere Linienlücken zulassen (bis 64 Pixel)</label>
 <button id="draft" disabled>Entwurf speichern</button>
 </div>
 <div class="tools">
@@ -68,7 +69,7 @@ Prüfe danach den Pfad und die Über-/Unterführung an jeder Kreuzung. Die gespe
 <li>Für ein sauberes rechtwinkliges Rasterbild: „Raster und Bild erkennen“ bestimmt Abstand und Ursprung und zeichnet den Pfad nach. Alternativ das Raster selbst einstellen und „Bild automatisch erkennen“ wählen. Dunkle Linien auf hellem Grund werden lokal ausgewertet. Das Ergebnis mit der Vorlage vergleichen; orange Kreuzungen brauchen eine manuelle Wahl. „Entwurf speichern“ erhält auch offene Wahlen.</li>
 <li>Für eine freie Kurve: „Freie Kurve erkennen“ skelettiert eine durchgezogene dunkle Linie und überführt ihren geprüften Graphen auf ein feines rechtwinkliges Raster. Alle Über-/Unterführungen anschließend manuell wählen. Kreuzungslücken, Berührungen, Beschriftungen und Papierstrukturen sind in diesem Modus nicht unterstützt.</li>
 <li>„Kurve mit Kreuzungslücken erkennen“ ergänzt nur kurze, gerade Unterbrechungen mit zwei ausgerichteten Enden und einem durchgezogenen querenden Strang. Die belegten Überführungen werden grün markiert; durchgezogene Kreuzungen bleiben offen. Mehrdeutige oder sonstige offene Enden führen zum Fehler. Anschließend die gesamte Vorlage und die Kreuzungswahlen prüfen.</li>
-<li>„Kurve mit Linienlücken erkennen“ und „Scan mit Linienlücken erkennen“ ergänzen zusätzlich kurze gerade Linienabbrüche ohne querenden Strang. Ergänzte Linienlücken werden rot markiert und im Bericht gespeichert. Jede Ergänzung mit dem Original vergleichen: Die lokale Ausrichtung belegt keine Zeichenabsicht. Durchgezogene Kreuzungen brauchen weiterhin eine manuelle Wahl.</li>
+<li>„Kurve mit Linienlücken erkennen“ und „Scan mit Linienlücken erkennen“ ergänzen zusätzlich kurze gerade Linienabbrüche ohne querenden Strang. Optional „Längere Linienlücken zulassen“ einschalten: bis 64 statt 32 Pixel Endabstand, mit längeren geraden Armen und größerem Freiraum. Die Auswahl gilt nur für die beiden Linienlücken-Modi. Ergänzte Linienlücken werden rot markiert und im Bericht gespeichert. Jede Ergänzung mit dem Original vergleichen: Die lokale Ausrichtung belegt keine Zeichenabsicht. Durchgezogene Kreuzungen brauchen weiterhin eine manuelle Wahl.</li>
 <li>Für ungleichmäßig beleuchtete Vorlagen: „Scan-Vorschau“ zeigt die lokal aufgehellte Schwarzweißmaske. Radius größer als die Strichbreite wählen; Mindestkontrast unterhalb des Linienkontrasts und oberhalb schwacher Papiertextur einstellen. Original und Maske mit dem Schalter vergleichen, dann einen Scan-Erkennungsknopf wählen. Die Varianten mit Kreuzungs- oder Linienlücken ergänzen separat geprüfte Verbindungen. Die Vorschau zeigt die Maske vor Ergänzungen. Die gesamte Maske und den Pfad mit der Vorlage vergleichen; allgemeine Schrift und starke Textur bleiben nicht unterstützt.</li>
 <li>Optional kleine isolierte Flecken im Scan entfernen: „Kleine Fremdkomponenten entfernen“ auf 1–64 schwarze Pixel stellen (0 = aus). Höchstens 32 Komponenten mit insgesamt 1024 Pixeln und mindestens zwölf Pixeln Abstand zu jeder anderen Tinte sind erlaubt. Nahe Tinte und kleine Randanschnitte führen zum Fehler. Die Scan-Vorschau markiert entfernte Stellen violett. Jede Entfernung im Vergleich mit dem Original prüfen: Auch ein gewollter kleiner Diagrammteil kann wie ein Fleck aussehen. Die Auswahl gilt für alle drei Scan-Modi; größere Fremdstrukturen bleiben erhalten.</li>
 <li>Raster einstellen und die Linie einmal der Reihe nach abklicken. Der nächste Punkt rastet horizontal oder vertikal zum vorherigen ein. Zusätzliche Ecken helfen beim Nachzeichnen runder Bögen. Den Startpunkt nicht nochmals setzen.</li>
@@ -191,15 +192,17 @@ const TracerModel = (() => {
         }
         if(r.line_gaps!==undefined){
           const g=r.line_gaps,pixel=p=>Array.isArray(p)&&p.length===2&&p.every(integer)&&view&&p[0]>=0&&p[0]<view.width&&p[1]>=0&&p[1]<view.height;
-          if(r.algorithm!=='skeleton-orthogonal-v1'||!view||!g||g.algorithm!=='local-line-gaps-v1'||!Array.isArray(g.evidence)
+          const extended=g?.algorithm==='local-line-gaps-v2',limit=extended?64:32;
+          if(r.algorithm!=='skeleton-orthogonal-v1'||!view||!g||!['local-line-gaps-v1','local-line-gaps-v2'].includes(g.algorithm)
+            ||(extended?g.max_distance!==64:g.max_distance!==undefined)||!Array.isArray(g.evidence)
             ||g.evidence.length+(r.crossing_gaps?.evidence.length??0)>20||r.inferred_crossings+r.unresolved_crossings!==found.length
             ||g.evidence.some(e=>!e||!Array.isArray(e.endpoints)||e.endpoints.length!==2||!e.endpoints.every(pixel)
               ||Math.hypot(e.endpoints[0][0]-e.endpoints[1][0],e.endpoints[0][1]-e.endpoints[1][1])<10
-              ||Math.hypot(e.endpoints[0][0]-e.endpoints[1][0],e.endpoints[0][1]-e.endpoints[1][1])>32
-              ||!integer(e.added_pixels)||e.added_pixels<3||e.added_pixels>64))throw Error('Ungültiger Linienlücken-Bericht.');
+              ||Math.hypot(e.endpoints[0][0]-e.endpoints[1][0],e.endpoints[0][1]-e.endpoints[1][1])>limit
+              ||!integer(e.added_pixels)||e.added_pixels<3||e.added_pixels>2*limit))throw Error('Ungültiger Linienlücken-Bericht.');
           const ends=[...g.evidence,...(r.crossing_gaps?.evidence??[])].flatMap(e=>e.endpoints.map(p=>p.join(',')));
           if(new Set(ends).size!==ends.length)throw Error('Ungültiger Linienlücken-Bericht: Enden mehrfach verwendet.');
-          drawing.recognition.line_gaps={algorithm:g.algorithm,evidence:g.evidence.map(e=>({endpoints:e.endpoints.map(p=>[...p]),added_pixels:e.added_pixels}))};
+          drawing.recognition.line_gaps={algorithm:g.algorithm,...(extended?{max_distance:64}:{}),evidence:g.evidence.map(e=>({endpoints:e.endpoints.map(p=>[...p]),added_pixels:e.added_pixels}))};
         }
         if(r.preprocessing!==undefined){
           const p=r.preprocessing;
@@ -535,7 +538,7 @@ const CurveTracer = (() => {
     }
     throw Error('Skelettierung nach 128 Schritten abgebrochen. Dünnere Linien verwenden.');
   }
-  function localGaps(mask,w,h,{crossings,lines}) {
+  function localGaps(mask,w,h,{crossings,lines,maxLineGap}) {
     // Only repair locally straight, isolated gaps. Every original endpoint must
     // have exactly one evidenced partner; no nearest-neighbour fallback.
     const skeleton=thin(mask,w,h).mask,xy=i=>[i%w,Math.floor(i/w)];
@@ -570,11 +573,11 @@ const CurveTracer = (() => {
     const candidates=[];
     for(let i=0;i<endpoints.length;i++)for(let j=i+1;j<endpoints.length;j++){
       const a=xy(endpoints[i]),b=xy(endpoints[j]),length=distance(a,b);
-      if(length<10||length>40)continue;
+      if(length<10||length>Math.max(crossings?40:0,lines?maxLineGap:0))continue;
       const u=delta(b,a).map(v=>v/length),left=arm(endpoints[i],neighbors(endpoints[i])[0]),right=arm(endpoints[j],neighbors(endpoints[j])[0]);
       if(!left||!right)continue;
-      const aligned=(path,sign)=>dot(delta(path[0],path.at(-1)),u)*sign/distance(path[0],path.at(-1))>.95
-        &&path.every(p=>normalDistance(p,a,u)<=3);
+      const aligned=(path,sign,cosine=.95,lateral=3)=>dot(delta(path[0],path.at(-1)),u)*sign/distance(path[0],path.at(-1))>cosine
+        &&path.every(p=>normalDistance(p,a,u)<=lateral);
       if(!aligned(left,1)||!aligned(right,-1))continue;
       // Original ink along the bridge must be: endpoint, white shoulder,
       // one crossing stroke, white shoulder, endpoint. Both shoulders >=2 px.
@@ -585,9 +588,14 @@ const CurveTracer = (() => {
         const dark=mask[p[1]*w+p[0]];
         if(runs.at(-1)?.dark===dark)runs.at(-1).points.push(p);else runs.push({dark,points:[p]});
       }
-      if(lines&&length<=32&&runs.length===3&&runs.every((r,k)=>r.dark===(k%2===0?1:0))&&runs[1].points.length>=3){
-        const center=a.map((v,k)=>(v+b[k])/2),radius=length/2+4;
-        const arms=[...left,...right],allowed=new Set(arms.map(key));let foreign=false;
+      if(lines&&length<=maxLineGap&&runs.length===3&&runs.every((r,k)=>r.dark===(k%2===0?1:0))&&runs[1].points.length>=3){
+        // Long bridges need proportionally longer, straighter evidence arms.
+        const long=length>32,steps=long?Math.ceil(length/2):10;
+        const lineLeft=long?arm(endpoints[i],neighbors(endpoints[i])[0],steps):left;
+        const lineRight=long?arm(endpoints[j],neighbors(endpoints[j])[0],steps):right;
+        if(!lineLeft||!lineRight||!aligned(lineLeft,1,long?.985:.95,long?2:3)||!aligned(lineRight,-1,long?.985:.95,long?2:3))continue;
+        const center=a.map((v,k)=>(v+b[k])/2),radius=length/2+(long?12:4);
+        const arms=[...lineLeft,...lineRight],allowed=new Set(arms.map(key));let foreign=false;
         // Every skeleton pixel in the disk belongs to the two traced arms.
         // Check original ink too, so thinning cannot hide an extra stroke.
         for(let y=Math.max(0,Math.floor(center[1]-radius));y<=Math.min(h-1,Math.ceil(center[1]+radius));y++)
@@ -596,9 +604,9 @@ const CurveTracer = (() => {
             if(skeleton[index]&&(!allowed.has(key(p))||neighbors(index).length>2))foreign=true;
             if(mask[index]&&!arms.some(q=>distance(p,q)<=8))foreign=true;
           }
-        if(!foreign)candidates.push({ends:[i,j],endpoints:[a,b],center,line,kind:'line'});
+        if(!foreign)candidates.push({ends:[i,j],endpoints:[a,b],center,line,kind:'line',clearance:long?radius:24});
       }
-      if(!crossings)continue;
+      if(!crossings||length>40)continue;
       if(runs.length!==5||runs.some((r,k)=>r.dark!==(k%2===0?1:0))||runs[1].points.length<2||runs[3].points.length<2)continue;
       const middle=runs[2].points,center=middle[Math.floor(middle.length/2)];
       if(distance(center,a)<length*.3||distance(center,b)<length*.3||middle.length>length*.5)continue;
@@ -626,7 +634,7 @@ const CurveTracer = (() => {
     }
     if(endpoints.some((_,i)=>candidates.filter(c=>c.ends.includes(i)).length!==1))
       throw Error('Offene oder mehrdeutige Lücke: kein eindeutiger lokaler Lückenbeleg. Vorlage manuell abzeichnen.');
-    if(candidates.some((a,i)=>candidates.some((b,j)=>j<i&&distance(a.center,b.center)<48)))
+    if(candidates.some((a,i)=>candidates.some((b,j)=>j<i&&distance(a.center,b.center)<(a.clearance??24)+(b.clearance??24))))
       throw Error('Lücken liegen zu nahe beieinander.');
     const repaired=mask.slice();
     for(const c of candidates){
@@ -855,14 +863,15 @@ const CurveTracer = (() => {
     if(visited.size!==g.edges.length||node!==0||port!==0)throw Error('Mehrere zyklische Stränge: nur einkomponentige Knoten werden unterstützt.');
     return {path:result,centers:boxes.map(b=>b.center),connectors:boxes.map(b=>b.connectors)};
   }
-  function recognize(image,{threshold=160,gaps=false,lineGaps=false}={}) {
+  function recognize(image,{threshold=160,gaps=false,lineGaps=false,maxLineGap=32}={}) {
+    if(!Number.isSafeInteger(maxLineGap)||![32,64].includes(maxLineGap))throw Error('Linienlücken-Grenze muss 32 oder 64 Pixel sein.');
     const pixels=RasterTracer.pixels(image,threshold),{foreground}=pixels,{width,height}=image;
     if(foreground>200000)throw Error('Zu viel Vordergrund: höchstens 200000 dunkle Pixel.');
-    const repaired=gaps||lineGaps?localGaps(pixels.mask,width,height,{crossings:gaps,lines:lineGaps}):{mask:pixels.mask,evidence:[]},mask=repaired.mask;
+    const repaired=gaps||lineGaps?localGaps(pixels.mask,width,height,{crossings:gaps,lines:lineGaps,maxLineGap}):{mask:pixels.mask,evidence:[]},mask=repaired.mask;
     connected(mask,width,height,mask.reduce((a,b)=>a+b,0));
     const skeleton=thin(mask,width,height),fine=graph(skeleton.mask,width,height,3);
-    const lineEvidence=repaired.evidence.filter(e=>e.kind==='line').map(({endpoints,added_pixels,center})=>{
-      if(fine.boxes.some(b=>Math.hypot(...b.center.map((v,k)=>v-center[k]))<24))throw Error('Linienlücke liegt zu nahe an einer Kreuzung.');
+    const lineEvidence=repaired.evidence.filter(e=>e.kind==='line').map(({endpoints,added_pixels,center,clearance})=>{
+      if(fine.boxes.some(b=>Math.hypot(...b.center.map((v,k)=>v-center[k]))<clearance))throw Error('Linienlücke liegt zu nahe an einer Kreuzung.');
       return {endpoints,added_pixels};
     });
     const evidenceByBox=new Map();
@@ -914,7 +923,7 @@ const CurveTracer = (() => {
         recognition:{algorithm:'skeleton-orthogonal-v1',threshold,foreground_pixels:foreground,grid_edges:path.length-1,
           inferred_crossings:crossings.length,unresolved_crossings:found.length-crossings.length,sample_size:size,skeleton_pixels:fine.pixels,thinning_iterations:skeleton.iterations,
           ...(gaps?{crossing_gaps:{algorithm:'local-crossing-gaps-v1',evidence}}:{}),
-          ...(lineGaps?{line_gaps:{algorithm:'local-line-gaps-v1',evidence:lineEvidence}}:{})}};
+          ...(lineGaps?{line_gaps:{algorithm:maxLineGap===64?'local-line-gaps-v2':'local-line-gaps-v1',...(maxLineGap===64?{max_distance:64}:{}),evidence:lineEvidence}}:{})}};
     }catch(error){lastError=error.message;}
     throw Error(`Kurve nicht sicher erkennbar (3 Raster geprüft). ${lastError} Vorlage manuell abzeichnen.`);
   }
@@ -922,7 +931,7 @@ const CurveTracer = (() => {
 })();
 const ScanTracer = {
   recognize(image,options){
-    const prepared=ScanPreprocessor.prepare(image,options),record=CurveTracer.recognize(prepared.image,{gaps:options?.gaps===true,lineGaps:options?.lineGaps===true});
+    const prepared=ScanPreprocessor.prepare(image,options),record=CurveTracer.recognize(prepared.image,{gaps:options?.gaps===true,lineGaps:options?.lineGaps===true,maxLineGap:options?.maxLineGap});
     record.recognition.preprocessing=prepared.report;
     return record;
   }
@@ -1018,6 +1027,7 @@ const ScanTracer = {
       ++imageRequest;image=null;scanPreview=null;if(imageUrl)URL.revokeObjectURL(imageUrl);imageUrl=null;
       if(candidate.recognition?.preprocessing){get('scan-radius').value=candidate.recognition.preprocessing.window_radius;get('scan-contrast').value=candidate.recognition.preprocessing.contrast;}
       get('scan-cleanup').value=candidate.recognition?.preprocessing?.cleanup?.max_area??0;
+      get('long-line-gaps').checked=candidate.recognition?.line_gaps?.algorithm==='local-line-gaps-v2';
       status();render();
     }catch(error){message(error.message,true);}get('import').value='';
   });
@@ -1047,7 +1057,7 @@ const ScanTracer = {
     try{
       const pixels=imagePixels(),threshold=Number(get('threshold').value);
       const prepared=['scan','scan-gaps','scan-line-gaps'].includes(automatic)?ScanPreprocessor.prepare(pixels,scanOptions()):null;
-      const gapOptions={gaps:['gaps','scan-gaps','line-gaps','scan-line-gaps'].includes(automatic),lineGaps:['line-gaps','scan-line-gaps'].includes(automatic)};
+      const gapOptions={gaps:['gaps','scan-gaps','line-gaps','scan-line-gaps'].includes(automatic),lineGaps:['line-gaps','scan-line-gaps'].includes(automatic),maxLineGap:get('long-line-gaps').checked?64:32};
       const record=prepared?CurveTracer.recognize(prepared.image,gapOptions):['curve','gaps','line-gaps'].includes(automatic)?CurveTracer.recognize(pixels,{threshold,...gapOptions}):automatic?RasterTracer.recognizeAuto(pixels,{threshold}):RasterTracer.recognize(pixels,{spacing:spacing(),origin:origin(),threshold});
       if(prepared)record.recognition.preprocessing=prepared.report;
       record.source_image=drawing.source;

@@ -575,6 +575,38 @@ Browserprüfung oder Abnahme beliebiger realer Scans. Die Bereinigung belegt
 keine Zeichenabsicht; jede Entfernung ist mit dem Original zu vergleichen.
 Bedienung, Bericht und Grenzen: [Fremdkomponenten](cleanup_tracer.md).
 
+## Arbeitspaket AP-09: Längere isolierte gerade Linienabbrüche
+
+Status: **umgesetzt am 11.11.2026**. Nach AP-08 war kein weiteres nummeriertes
+Paket festgelegt. AP-09 konkretisiert den dokumentierten offenen Punkt
+„lange Linienabbrüche“ für gerade, isolierte Unterbrechungen bis 64 Pixel
+Endabstand. Beliebige lange oder gekrümmte Unterbrechungen bleiben offen.
+
+- [x] Explizite, standardmäßig ausgeschaltete Erweiterung von 32 auf 64 Pixel;
+  für längere Lücken proportional längere, streng ausgerichtete Endarme prüfen.
+- [x] Größere freie Pixelumgebung und Abstände zu Kreuzungen und anderen Lücken
+  verlangen; eindeutige gemeinsame Endpaarung und sämtliche bisherigen
+  Graph-/Topologieprüfungen beibehalten.
+- [x] Beide Linienlücken-Modi einschließlich Scan-Bereinigung anbinden;
+  rote Markierungen, vollständige Fehlererholung und Importwiederherstellung.
+- [x] Eigenen v2-Bericht mit maximalem Endabstand in JavaScript/Python prüfen,
+  in JSON, Gitter-/Turtle-Export und Galerie erhalten; Altdaten unverändert
+  unterstützen und veraltete Herkunft bei Geometrie-/Rasteränderungen verwerfen.
+- [x] Reproduzierbare PNG, Kontrollüberlagerung, Annotation, teiloffenen Entwurf,
+  simulierten Scan und Offline-Galerie bereitstellen.
+- [x] Echte PNG-Pixel, exakte 32/33/64/65-Pixel-Grenzen, gekrümmte und zu kurze
+  Arme, Fremdtinte, Drehungen, Spiegel/Händigkeit, Strichbreiten, Transparenz,
+  Kombinationsmodi, Bedienereignisse, Berichtfehler und Turtle-Roundtrip prüfen.
+
+`node examples/make_long_line_gap_trace.cjs` erzeugt
+`examples/long_line_gap_trace/`: eine 55 Pixel lange Linienlücke, drei belegte
+Überführungen und einen Trefoil `T(2,3)` mit 3702 Gitterpunkten ohne manuelle
+Kreuzungswahl. Vorlage und Kontrollüberlagerung wurden visuell geprüft.
+Abnahme: 103 Python-Tests, acht Node-Editor-/Erkennungsprüfungen und zehn
+Galerieprüfungen erfolgreich. Keine manuelle Browserprüfung oder Abnahme
+beliebiger realer Scans. Bedienung, Bericht und Grenzen:
+[Längere Linienabbrüche](long_line_gap_tracer.md).
+
 ## Nächste Ausbaustufe: weitergehende Scanerkennung (weiter offen)
 
 AP-02 und AP-03 erkennen saubere rechtwinklige Diagramme mit manuell oder
@@ -584,6 +616,8 @@ Helligkeitskorrektur. AP-06 ergänzt lokal belegte Kreuzungslücken; AP-07 ergä
 kurze, gerade, isolierte Linienabbrüche mit dokumentierten Pixelbelegen.
 AP-08 ergänzt die explizit zuschaltbare Entfernung kleiner isolierter
 Fremdkomponenten mit Pixelbilanz und markierter Vorschau.
+AP-09 erweitert gerade Linienabbrüche ausdrücklich zuschaltbar auf 64 Pixel
+Endabstand, mit längeren Armbelegen und größerem Freiraum.
 Die allgemeinere Bildaufbereitung bleibt offen:
 
 ```text
@@ -603,7 +637,7 @@ Turtle-Code
 ```
 
 Starke Papierstrukturen, abrupte Beleuchtungswechsel, allgemeine Beschriftungen,
-lange oder stark gekrümmte Linienabbrüche, geometrisch unklare Kreuzungslücken und
+beliebig lange oder stark gekrümmte Linienabbrüche, geometrisch unklare Kreuzungslücken und
 Entzerrung sind weiterhin offen. Mehrdeutige Lücken erzeugen auch nach AP-07
 keine stillschweigende Verbindung oder Kreuzungswahl. Die Übereinstimmung
 der erkannten beziehungsweise manuell festgelegten Projektion mit der Bildvorlage

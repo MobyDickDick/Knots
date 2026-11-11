@@ -121,6 +121,14 @@ Randanschnitte werden zurückgewiesen, alle Entfernungen im JSON dokumentiert.
 `node examples/make_cleanup_trace.cjs` erzeugt Vorlage, Maske, Kontrollüberlagerung,
 Entwurf, ergänzte Annotation und Galerie in `examples/cleanup_trace/`.
 Bedienung und Grenzen: [docs/cleanup_tracer.md](docs/cleanup_tracer.md).
+AP-09 ergänzt die standardmäßig ausgeschaltete Option „Längere Linienlücken
+zulassen (bis 64 Pixel)“ für beide Linienlücken-Modi. Längere gerade Arme und
+größere freie Umgebungen sind Pflicht; gekrümmte oder mehrdeutige Fälle werden
+zurückgewiesen. Der versionierte Bericht erhält die verwendete Grenze, die
+Galerie zeigt sie an. `node examples/make_long_line_gap_trace.cjs` erzeugt
+Vorlage, Kontrollüberlagerung, Entwurf, Scan-Variante und Trefoil-Galerie in
+`examples/long_line_gap_trace/`. Bedienung, Pixelprüfungen und Grenzen:
+[docs/long_line_gap_tracer.md](docs/long_line_gap_tracer.md).
 Starke Textur, Beschriftungen, beliebige Unterbrechungen und Entzerrung
 bleiben allgemein offen. Bedienung und Grenzen der Scan-Aufbereitung:
 [docs/scan_tracer.md](docs/scan_tracer.md). Verfahren der freien Kurvenerkennung:

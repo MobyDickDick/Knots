@@ -27,3 +27,5 @@ build/
 !examples/line_gap_trace/*.svg
 !examples/cleanup_trace/*.json
 !examples/cleanup_trace/*.svg
+!examples/long_line_gap_trace/*.json
+!examples/long_line_gap_trace/*.svg

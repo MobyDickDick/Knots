@@ -170,9 +170,13 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
         line_report = None
         if "line_gaps" in recognition:
             line_report = recognition["line_gaps"]
+            extended = isinstance(line_report, dict) and line_report.get("algorithm") == "local-line-gaps-v2"
+            limit = 64 if extended else 32
             crossing_evidence = gap_report["evidence"] if gap_report else []
             if (not curve or view is None or not isinstance(line_report, dict)
-                    or line_report.get("algorithm") != "local-line-gaps-v1"
+                    or line_report.get("algorithm") not in ("local-line-gaps-v1", "local-line-gaps-v2")
+                    or (type(line_report.get("max_distance")) is not int or line_report["max_distance"] != 64
+                        if extended else "max_distance" in line_report)
                     or not isinstance(line_report.get("evidence"), list)
                     or len(line_report["evidence"]) + len(crossing_evidence) > 20
                     or recognition["inferred_crossings"] + recognition["unresolved_crossings"] != len(diagram_crossings(record["waypoints"]))):
@@ -185,12 +189,14 @@ def annotation_from_dict(record: dict) -> DiagramAnnotation:
                     raise ValueError("invalid line gap report endpoints")
                 endpoints = [_coordinate(p, "line gap endpoints") for p in item["endpoints"]]
                 if (any(not 0 <= p[0] < view["width"] or not 0 <= p[1] < view["height"] or p in used for p in endpoints)
-                        or not 100 <= sum((a-b)**2 for a, b in zip(*endpoints)) <= 1024
-                        or type(item.get("added_pixels")) is not int or not 3 <= item["added_pixels"] <= 64):
+                        or not 100 <= sum((a-b)**2 for a, b in zip(*endpoints)) <= limit**2
+                        or type(item.get("added_pixels")) is not int or not 3 <= item["added_pixels"] <= 2 * limit):
                     raise ValueError("invalid line gap report evidence")
                 used.update(endpoints)
                 evidence.append(dict(endpoints=[list(p) for p in endpoints], added_pixels=item["added_pixels"]))
             line_report = dict(algorithm=line_report["algorithm"], evidence=evidence)
+            if extended:
+                line_report["max_distance"] = 64
         preprocessing = recognition.get("preprocessing")
         cleanup = None
         if "preprocessing" in recognition:

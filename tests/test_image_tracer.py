@@ -292,6 +292,32 @@ class ImageTracerTests(unittest.TestCase):
             with self.subTest(patch=patch), self.assertRaisesRegex(ValueError, "line gap"):
                 annotation_from_dict(bad)
 
+    def test_long_line_gap_example_and_version_limits(self):
+        record = json.loads((Path(__file__).resolve().parents[1] / "examples/long_line_gap_trace/annotation.json").read_text())
+        annotation = annotation_from_dict(record)
+        self.assertEqual(annotation_to_dict(annotation), record)
+        report = record["recognition"]["line_gaps"]
+        self.assertEqual(report["algorithm"], "local-line-gaps-v2")
+        self.assertEqual(report["max_distance"], 64)
+        endpoints = report["evidence"][0]["endpoints"]
+        self.assertEqual(sum((a-b)**2 for a, b in zip(*endpoints)), 55**2)
+        trace = trace_annotation(annotation)
+        self.assertTrue(validate_cycle(trace.points).is_valid)
+        self.assertEqual(trace_turtle(trace.code).points, trace.points)
+        self.assertEqual(classify_knot(trace.points).name, "T(2,3)")
+        for patch in ({"max_distance": True}, {"max_distance": None}, {"max_distance": 32},
+                      {"algorithm": "local-line-gaps-v1"}):
+            bad = json.loads(json.dumps(record))
+            bad["recognition"]["line_gaps"].update(patch)
+            with self.subTest(patch=patch), self.assertRaisesRegex(ValueError, "line gap"):
+                annotation_from_dict(bad)
+        with TemporaryDirectory() as directory:
+            metadata = json.loads(write_traced_diagram(annotation, directory).read_text())
+            self.assertEqual(metadata["annotation"], record)
+            gallery = (Path(directory) / "index.html").read_text(encoding="utf-8")
+            self.assertIn("Linienlücken: maximaler Endabstand", gallery)
+            self.assertIn("local-line-gaps-v2", gallery)
+
     def test_cleanup_example_roundtrip_export_and_invalid_evidence(self):
         record = json.loads((Path(__file__).resolve().parents[1] / "examples/cleanup_trace/annotation.json").read_text())
         annotation = annotation_from_dict(record)
