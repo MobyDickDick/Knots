@@ -227,6 +227,39 @@ class GeneratorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             search_candidates(-1)
 
+    def test_mixed_travels_have_local_overpasses_in_both_directions(self):
+        from knots_grid import TravelConfig, find_crossings, travel_candidate
+
+        for size in (4, 10, 24):
+            for seed in (0, 11, 2026):
+                with self.subTest(size=size, seed=seed):
+                    config = TravelConfig(point_count=size)
+                    original = travel_candidate(seed=seed, config=config)
+                    mixed = travel_candidate(seed=seed, config=config, crossing_mode="mixed")
+                    self.assertTrue(validate_cycle(mixed.points).is_valid)
+                    self.assertEqual(trace_turtle(mixed.code).points, mixed.points)
+                    self.assertEqual(mixed, travel_candidate(seed=seed, config=config, crossing_mode="mixed"))
+                    crossings = find_crossings(mixed.points)
+                    self.assertEqual({c.coordinate for c in crossings},
+                                     {(4*c.coordinate[0], 4*c.coordinate[1])
+                                      for c in find_crossings(original.points)})
+                    upper_axes = {mixed.points[c.upper_index - 1].y == mixed.points[c.upper_index + 1].y
+                                  for c in crossings}
+                    if len(crossings) >= 2:
+                        self.assertEqual(upper_axes, {False, True})
+                    self.assertEqual(mixed.code.count("3"), 2 * len(crossings))
+
+    def test_mixed_travel_batch_is_reproducible_and_mode_is_validated(self):
+        from knots_grid import travel_candidate, travel_candidates
+
+        batch = travel_candidates(3, seed=2026, crossing_mode="mixed")
+        self.assertEqual(batch, travel_candidates(3, seed=2026, crossing_mode="mixed"))
+        self.assertEqual(batch[0], travel_candidate(seed=2026, crossing_mode="mixed"))
+        with self.assertRaises(ValueError):
+            travel_candidate(crossing_mode="invalid")
+        with self.assertRaises(ValueError):
+            travel_candidates(0, crossing_mode="invalid")
+
 
 class ReidemeisterTests(unittest.TestCase):
     def test_trefoil_has_no_reidemeister_one_or_two_candidate(self):

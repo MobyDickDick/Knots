@@ -1,13 +1,12 @@
 import http.client
-from http.server import ThreadingHTTPServer
 import json
 import threading
 import unittest
 from unittest.mock import patch
 from xml.etree import ElementTree
 
-from knots_grid import Point, trace_turtle, validate_cycle
-from knots_grid.studio import StudioHandler, generate_record
+from knots_grid import Point, find_crossings, trace_turtle, validate_cycle
+from knots_grid.studio import StudioHandler, StudioServer, generate_record
 
 
 class StudioGenerationTests(unittest.TestCase):
@@ -40,6 +39,15 @@ class StudioGenerationTests(unittest.TestCase):
         self.assertEqual(first, generate_record(options))
         self.assertEqual(first["parameters"]["seed"], options["seed"])
 
+    def test_studio_defaults_to_mixed_crossings_and_exports_replayable_parameters(self):
+        record = generate_record({"preset": "travel", "seed": "2026"})
+        points = tuple(Point(*p) for p in record["points"])
+        upper_axes = {points[c.upper_index - 1].y == points[c.upper_index + 1].y
+                      for c in find_crossings(points)}
+        self.assertEqual(upper_axes, {False, True})
+        self.assertEqual(record["parameters"]["crossing_mode"], "mixed")
+        self.assertEqual(record, generate_record(record["parameters"]))
+
     def test_malformed_or_unbounded_options_are_rejected(self):
         for options in (
             [], None, {"preset": []}, {"preset": "unknown"}, {"seed": True},
@@ -47,7 +55,8 @@ class StudioGenerationTests(unittest.TestCase):
             {"seed": "9223372036854775808"}, {"seed": "9" * 1000},
             {"point_count": 3}, {"point_count": 25}, {"point_count": 4.0},
             {"crossings": 4}, {"crossings": 17}, {"steps": 61}, {"steps": -1},
-            {"output": "unrequested-file"},
+            {"output": "unrequested-file"}, {"crossing_mode": "invalid"},
+            {"crossing_mode": []},
         ):
             with self.subTest(options=str(options)[:100]):
                 with self.assertRaises(ValueError):
@@ -57,7 +66,7 @@ class StudioGenerationTests(unittest.TestCase):
 class StudioHTTPTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.server = ThreadingHTTPServer(("127.0.0.1", 0), StudioHandler)
+        cls.server = StudioServer(("127.0.0.1", 0), StudioHandler)
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
 
@@ -101,6 +110,11 @@ class StudioHTTPTests(unittest.TestCase):
         self.assertEqual(self.request("GET", "/", headers={"Host": "foreign.example"})[0], 403)
         headers = {"Content-Type": "application/json", "Origin": "https://foreign.example"}
         self.assertEqual(self.request("POST", "/api/generate", "{}", headers)[0], 403)
+
+    def test_a_second_server_cannot_share_the_same_port(self):
+        with self.assertRaises(OSError):
+            second = StudioServer(("127.0.0.1", self.server.server_port), StudioHandler)
+            second.server_close()
 
     def test_search_exhaustion_becomes_an_actionable_response(self):
         with patch("knots_grid.studio.travel_candidate", side_effect=RuntimeError("attempt limit")):

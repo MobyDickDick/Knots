@@ -266,6 +266,7 @@ def travel_candidate(
     *,
     seed: int | None = None,
     config: TravelConfig = TravelConfig(),
+    crossing_mode: str = "grid",
 ) -> TraceResult:
     """Generate a closed candidate by trying random travels through markers.
 
@@ -274,11 +275,14 @@ def travel_candidate(
     permutation for X markers and one for O markers.  Because both permutations
     use every row/column once, no two marker waypoints share an x- or
     y-coordinate.  The resulting grid diagram routes horizontally on layer 0
-    and vertically on layer 1, so projected crossings get deterministic
-    over/under information instead of invalid same-layer intersections.
+    and vertically on layer 1 in the legacy ``grid`` mode. In ``mixed`` mode,
+    over/under choices are randomized per crossing on a fourfold refined grid.
+    With at least two crossings, both horizontal-over and vertical-over occur.
+    Changing these choices can change the knot type.
     """
 
-    return _travel_candidate(Random(seed), config)
+    _validate_crossing_mode(crossing_mode)
+    return _travel_candidate(Random(seed), config, crossing_mode=crossing_mode)
 
 
 def travel_candidates(
@@ -286,14 +290,53 @@ def travel_candidates(
     *,
     seed: int | None = None,
     config: TravelConfig = TravelConfig(),
+    crossing_mode: str = "grid",
 ) -> tuple[TraceResult, ...]:
     """Generate ``count`` permutation-travel candidates from one random stream."""
 
     if count < 0:
         raise ValueError("count must be non-negative")
 
+    _validate_crossing_mode(crossing_mode)
     random = Random(seed)
-    return tuple(_travel_candidate(random, config) for _ in range(count))
+    return tuple(_travel_candidate(random, config, crossing_mode=crossing_mode)
+                 for _ in range(count))
+
+
+def _validate_crossing_mode(mode: str) -> None:
+    if mode not in ("grid", "mixed"):
+        raise ValueError("crossing_mode must be 'grid' or 'mixed'")
+
+
+def _mix_crossings(candidate: TraceResult, random: Random) -> TraceResult:
+    """Re-embed the same planar travel with locally chosen over-strands.
+
+    The existing diagram tracer provides disjoint lift windows: fourfold
+    refinement puts switches one unit before/after each crossing, leaving
+    every crossing transverse and preventing collisions between nearby lifts.
+    """
+    from .image_tracer import CrossingChoice, DiagramAnnotation, diagram_crossings, trace_annotation
+
+    planar = []
+    for point in candidate.points:
+        xy = (point.x, point.y)
+        if not planar or planar[-1] != xy:
+            planar.append(xy)
+    planar.pop()  # The repeated closing point is implicit in the annotation.
+    waypoints = tuple(p for i, p in enumerate(planar)
+                      if (p[0] - planar[i - 1][0], p[1] - planar[i - 1][1]) !=
+                      (planar[(i + 1) % len(planar)][0] - p[0],
+                       planar[(i + 1) % len(planar)][1] - p[1]))
+    found = sorted(diagram_crossings(waypoints).items())
+    # Uniform over all assignments except the two direction-locked patterns.
+    mask = random.randrange(1, (1 << len(found)) - 1) if len(found) >= 2 else random.getrandbits(len(found))
+    choices = []
+    for index, (coordinate, segments) in enumerate(found):
+        horizontal = next(s for s in segments
+                          if waypoints[s][1] == waypoints[(s + 1) % len(waypoints)][1])
+        vertical = next(s for s in segments if s != horizontal)
+        choices.append(CrossingChoice(coordinate, horizontal if mask & (1 << index) else vertical))
+    return trace_annotation(DiagramAnnotation(waypoints, tuple(choices)))
 
 
 def _generate_candidate(random: Random, config: GeneratorConfig) -> TraceResult:
@@ -318,7 +361,7 @@ def _generate_candidate(random: Random, config: GeneratorConfig) -> TraceResult:
     return make_candidate("".join(parts))
 
 
-def _travel_candidate(random: Random, config: TravelConfig) -> TraceResult:
+def _travel_candidate(random: Random, config: TravelConfig, *, crossing_mode: str = "grid") -> TraceResult:
     columns = list(range(config.point_count))
 
     for _ in range(config.max_attempts):
@@ -331,9 +374,10 @@ def _travel_candidate(random: Random, config: TravelConfig) -> TraceResult:
             continue
 
         try:
-            return _grid_diagram_candidate(tuple(x_columns), tuple(o_columns))
+            candidate = _grid_diagram_candidate(tuple(x_columns), tuple(o_columns))
         except ValueError:
             continue
+        return _mix_crossings(candidate, random) if crossing_mode == "mixed" else candidate
 
     raise RuntimeError(
         "could not find a one-component crossing-safe travel diagram "

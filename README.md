@@ -19,6 +19,11 @@ ein anderer Port wählen; **Strg+C** im Serverfenster beendet ihn.
 - Zufällige Gitterkandidaten mit 4–24 Markerpaaren oder ornamentale Unknoten
   mit bis zu 60 Suchschritten erzeugen. Seeds bleiben bis `2^63 - 1` exakt und
   liefern mit denselben Parametern reproduzierbare Ergebnisse.
+- Bei Zufallskandidaten wird die Überführung pro Kreuzung gewählt, unabhängig
+  von der Richtung. Ab zwei Kreuzungen gibt es sowohl waagrechte als auch
+  senkrechte Überführungen. Kurze lokale Brücken auf einem vierfach verfeinerten
+  Gitter halten die Pfade kollisionsfrei. Die Referenzdiagramme behalten ihren
+  festgelegten Knotentyp und ihre ursprüngliche Konstruktion.
 - Zwischen der verschobenen 2-D-Gitterprojektion und der drehbaren 3-D-Ansicht
   wechseln. In 3-D mit Maus/Touch ziehen oder die Pfeiltasten verwenden;
   Mausrad sowie `+`/`-` zoomen und `Home` setzt die Ansicht zurück.
@@ -33,6 +38,19 @@ minimal. Das JSON verwendet die Konvention von `knots_grid`: **Der Startpunkt
 wird am Ende wiederholt.** Der Turtle-Code rekonstruiert diese Punkte exakt mit
 Start `(0,0,0)` und Richtung Ost. Die Oberfläche arbeitet ausschließlich lokal
 und verwendet den vorhandenen Python-Kern.
+
+Die freie Kreuzungsführung ist auch über die Python-API verfügbar:
+
+```python
+from knots_grid import travel_candidate
+
+candidate = travel_candidate(seed=2026, crossing_mode="mixed")
+```
+
+`crossing_mode="grid"` bleibt der API-Standard für bisherige Durchläufe;
+die Bedienoberfläche verwendet für Zufallskandidaten standardmäßig `"mixed"`.
+Das JSON speichert den Modus zur exakten Wiederholung. Andere Über-/Unterwahlen
+können den Knotentyp ändern; jeder neue Kandidat wird erneut klassifiziert.
 
 Dieses Repository enthält drei Bausteine für zyklische Punktmengen in
 `Z^2 x {0, 1}`.  Ein Knoten wird als Turtle-Step-Zyklus gespeichert: Jeder

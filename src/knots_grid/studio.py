@@ -7,6 +7,7 @@ from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
+import socket
 from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit
 import webbrowser
@@ -44,7 +45,7 @@ def generate_record(options: dict) -> dict:
     """Generate, validate and describe a cycle. Seeds remain exact strings in JS."""
     if not isinstance(options, dict):
         raise ValueError("Die Parameter müssen ein JSON-Objekt sein.")
-    if set(options) - {"preset", "seed", "point_count", "crossings", "steps"}:
+    if set(options) - {"preset", "seed", "point_count", "crossings", "steps", "crossing_mode"}:
         raise ValueError("Unbekannter Generatorparameter.")
     preset = options.get("preset", "trefoil")
     if not isinstance(preset, str) or preset not in PRESETS:
@@ -55,6 +56,9 @@ def generate_record(options: dict) -> dict:
     steps = _integer(options.get("steps", 18), "Suchschritte", 0, 60)
     if crossings % 2 == 0:
         raise ValueError("Die Toruskreuzungszahl muss ungerade sein.")
+    crossing_mode = options.get("crossing_mode", "mixed")
+    if crossing_mode not in ("grid", "mixed"):
+        raise ValueError("Die Kreuzungsführung muss 'grid' oder 'mixed' sein.")
 
     if preset == "trefoil":
         candidate = trefoil_candidate()
@@ -63,7 +67,8 @@ def generate_record(options: dict) -> dict:
     elif preset == "torus":
         candidate = torus_knot_candidate(crossings)
     elif preset == "travel":
-        candidate = travel_candidate(seed=seed, config=TravelConfig(point_count=size))
+        candidate = travel_candidate(seed=seed, config=TravelConfig(point_count=size),
+                                     crossing_mode=crossing_mode)
     else:
         candidate = search_candidate(seed=seed, config=SearchConfig(
             min_search_steps=steps, max_search_steps=steps,
@@ -79,7 +84,8 @@ def generate_record(options: dict) -> dict:
     return {
         "schema_version": 1,
         "parameters": {"preset": preset, "seed": str(seed), "point_count": size,
-                       "crossings": crossings, "steps": steps},
+                       "crossings": crossings, "steps": steps,
+                       "crossing_mode": crossing_mode if preset == "travel" else "grid"},
         "name": classification.name,
         "classification": {"status": classification.status,
                            "evidence": classification.evidence,
@@ -92,6 +98,17 @@ def generate_record(options: dict) -> dict:
         "metrics": asdict(score.metrics),
         "svg": svg,
     }
+
+
+class StudioServer(ThreadingHTTPServer):
+    # Windows SO_REUSEADDR otherwise lets a second server silently share the
+    # port, leaving a browser connected to an older generator after a restart.
+    allow_reuse_address = not hasattr(socket, "SO_EXCLUSIVEADDRUSE")
+
+    def server_bind(self):
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
 
 class StudioHandler(BaseHTTPRequestHandler):
@@ -166,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--open", action="store_true", help="open the browser on startup")
     args = parser.parse_args(argv)
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", args.port), StudioHandler)
+        server = StudioServer(("127.0.0.1", args.port), StudioHandler)
     except OSError as error:
         parser.exit(1, f"Der Generator konnte nicht starten: {error}\n"
                        "Versuche einen anderen Port mit --port 8766.\n")

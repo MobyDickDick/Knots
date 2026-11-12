@@ -17,7 +17,7 @@ const descriptions = {
   trefoil: "Der klassische Kleeblattknoten als geprüftes 5 × 5-Gitterdiagramm.",
   "figure-eight": "Der Achterknoten in einer festen Gitterdarstellung mit sechs Bogenpaaren.",
   torus: "Eine Familie echter Knoten. Die ungerade Zahl q bestimmt den Knotentyp.",
-  travel: "Zufällige X/O-Marker werden zu einem geschlossenen, kreuzungssicheren Weg verbunden.",
+  travel: "Die Überführung wird an jeder Kreuzung einzeln gewählt: mal waagrecht oben, mal senkrecht.",
   ornamental: "Ein Rechteck wächst durch lokale Umwege zu einem abwechslungsreichen Unknoten.",
 };
 
@@ -89,6 +89,9 @@ async function generate(event) {
     }
     if (data.metrics.degeneracies) {
       evidence += ` ${data.metrics.degeneracies} Projektionsentartungen; der räumliche Pfad bleibt gültig.`;
+    }
+    if (data.parameters.preset === "travel" && data.parameters.crossing_mode === "mixed") {
+      evidence += " Freie Kreuzungsführung mit lokalen Überführungen auf einem vierfach verfeinerten Gitter.";
     }
     evidence += " JSON enthält den Startpunkt am Ende erneut; der Turtle-Code startet in (0,0,0) nach Osten.";
     if (["travel", "ornamental"].includes(data.parameters.preset)) {

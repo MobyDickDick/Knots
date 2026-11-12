@@ -31,14 +31,14 @@
             <option value="trefoil">Kleeblatt · T(2,3)</option>
             <option value="figure-eight">Achterknoten · 4₁</option>
             <option value="torus">Torusknoten · T(2,q)</option>
-            <option value="travel">Zufälliger Gitterkandidat</option>
+            <option value="travel" selected>Zufälliger Gitterkandidat</option>
             <option value="ornamental">Ornamentaler Unknoten</option>
           </select>
-          <p class="field-help" id="preset-help">Der klassische Kleeblattknoten als geprüftes 5 × 5-Gitterdiagramm.</p>
+          <p class="field-help" id="preset-help">Über- und Unterführungen werden unabhängig von der Fadenrichtung gewählt.</p>
           <div id="travel-options" hidden>
             <div class="range-label"><label for="point-count">Markerpaare</label><output id="point-count-value" for="point-count">10</output></div>
             <input id="point-count" type="range" min="4" max="24" value="10">
-            <p class="field-help">Mehr Marker lassen komplexere Wege zu. Der Knotentyp kann ungeklärt bleiben.</p>
+            <p class="field-help">Ab zwei Kreuzungen kommen beide Überführungsrichtungen vor. Der Knotentyp kann ungeklärt bleiben.</p>
           </div>
           <div id="torus-options" hidden>
             <div class="range-label"><label for="crossings">Kreuzungen q</label><output id="crossings-value" for="crossings">5</output></div>
