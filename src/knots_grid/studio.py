@@ -143,6 +143,8 @@ def minimize_record(options: dict) -> dict:
         "objective": "point count, layer-length imbalance, canonical Cantor order",
         "input_points": [[p.x, p.y, p.z] for p in original],
         "moves": [asdict(move) for move in result.moves], "normalization": transform,
+        "compression_count": sum(move.kind in ("coordinate_compression", "grid_slab_contraction")
+                                 for move in result.moves),
     }
     return record
 

@@ -31,7 +31,14 @@ ein anderer Port wählen; **Strg+C** im Serverfenster beendet ihn.
 - SVG, JSON mit Punkten/Parametern/Kennzahlen und Turtle-Code herunterladen.
   Die SVG-Datei zeigt stets die exakte 2-D-Gitterprojektion.
 - **Minimierung versuchen** bearbeitet den gerade erzeugten Knoten mit
-  geometrisch geprüften Flächen- und Reidemeister-Zügen. Zuerst zählt eine
+  einer globalen Gitterverdichtung sowie geometrisch geprüften Flächen- und
+  Reidemeister-Zügen. Die Verdichtung rückt die Koordinaten sämtlicher Ecken
+  und Ebenenwechsel zusammen. Ihre Reihenfolge und die Kreuzungsinformationen
+  bleiben erhalten; lange leere Abstände können dadurch in einem Zug
+  verschwinden, auch wenn lokale Einheitsflächenzüge blockiert sind.
+  Zusätzlich werden ganze Einheitsstreifen zusammengezogen, wenn dabei nur
+  benachbarte Knotenpunkte verschmelzen und die resultierende Kurve einfach
+  und kollisionsfrei bleibt. Zuerst zählt eine
   kleinere Punktzahl; bei gleicher Länge wird eine gleichmäßigere Fadenlänge
   auf beiden Ebenen bevorzugt. Ebenenwechsel werden dabei kollisionsfrei
   verschoben, statt die Über-/Unterwahl beliebig neu auszulosen.

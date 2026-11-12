@@ -161,12 +161,13 @@ async function minimize() {
     const details = data.optimization;
     const originalLength = generatedRecord.metrics.length;
     const endings = {
-      local_minimum: "Keine weitere Verbesserung mit den unterstützten lokalen Zügen gefunden.",
+      local_minimum: "Keine weitere Verkürzung durch Gitterverdichtung und die unterstützten lokalen Züge gefunden. Das beweist keine kürzestmögliche Darstellung.",
       move_limit: "Zuglimit erreicht. Mit einem weiteren Versuch fortsetzen.",
       time_limit: "Zeitlimit erreicht. Mit einem weiteren Versuch fortsetzen.",
       redistributed: "Ebenenverteilung verbessert. Ein weiterer Versuch kann neue Verkürzungen finden.",
     };
-    $("optimization-summary").textContent = `${originalLength} → ${data.metrics.length} Punkte · ${originalLength - data.metrics.length} entfernt. Letzter Versuch: ${details.move_count} Umformungen. ${endings[details.status] || details.status}`;
+    const compression = details.compression_count ? ` Davon ${details.compression_count} Gitterverdichtung(en).` : "";
+    $("optimization-summary").textContent = `${originalLength} → ${data.metrics.length} Punkte · ${originalLength - data.metrics.length} entfernt. Letzter Versuch: ${details.move_count} Umformungen.${compression} ${endings[details.status] || details.status}`;
     const before = generatedRecord.layer_lengths, after = data.layer_lengths;
     $("layer-summary").textContent = `Fadenlänge unten / oben: ${before[0]} / ${before[1]} → ${after[0]} / ${after[1]} Gitterschritte. Kürzere Wege haben Vorrang; bei gleicher Länge wird eine gleichmäßigere Verteilung bevorzugt.`;
     $("optimization-panel").hidden = false;

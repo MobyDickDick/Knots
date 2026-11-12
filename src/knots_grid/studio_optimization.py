@@ -60,7 +60,7 @@ def minimize_points(raw_points, *, max_moves=120, max_seconds=8):
         raise ValueError("Der Ausgangspfad ist nicht im Turtle-Format 0..3 darstellbar.")
     result = optimize_cycle(points, max_moves=max_moves, max_route_states=200,
                             balance_layers=True, max_seconds=max_seconds*0.75,
-                            candidate_filter=_encodable)
+                            candidate_filter=_encodable, compress_coordinates=True)
     distribution = redistribute_layers(result.points, max_moves=max_moves-len(result.moves),
                                         max_seconds=max_seconds*0.25, candidate_filter=_encodable)
     status = result.status

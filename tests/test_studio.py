@@ -168,14 +168,14 @@ class StudioMinimizationTests(unittest.TestCase):
         self.assertEqual(trace_turtle(result["code"]).points, tuple(Point(*p) for p in normalized))
         self.assertEqual(result["classification"]["determinant"], original["classification"]["determinant"])
 
-    def test_equal_length_moves_distribute_more_wire_on_the_upper_layer(self):
+    def test_minimization_shortens_and_improves_the_relative_layer_distribution(self):
         original = generate_record({"preset": "travel", "point_count": 8})
         result = minimize_record({"points": original["points"], "max_moves": 8,
                                   "parameters": original["parameters"]})
-        self.assertEqual(result["metrics"]["length"], original["metrics"]["length"])
-        self.assertGreater(result["layer_lengths"][1], original["layer_lengths"][1])
-        self.assertLess(abs(result["layer_lengths"][0]-result["layer_lengths"][1]),
-                        abs(original["layer_lengths"][0]-original["layer_lengths"][1]))
+        self.assertLess(result["metrics"]["length"], original["metrics"]["length"])
+        low, high = result["layer_lengths"]
+        old_low, old_high = original["layer_lengths"]
+        self.assertLess(abs(low-high)/max(1,low+high), abs(old_low-old_high)/(old_low+old_high))
 
     def test_continuation_operates_on_the_previous_result(self):
         original = generate_record({"preset": "travel", "point_count": 5})

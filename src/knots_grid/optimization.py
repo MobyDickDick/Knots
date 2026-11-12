@@ -33,9 +33,23 @@ class FaceMove:
 
 
 @dataclass(frozen=True, slots=True)
+class CoordinateCompression:
+    x_levels: tuple[int, ...]
+    y_levels: tuple[int, ...]
+    kind: str = "coordinate_compression"
+
+
+@dataclass(frozen=True, slots=True)
+class SlabContraction:
+    axis: int
+    coordinate: int
+    kind: str = "grid_slab_contraction"
+
+
+@dataclass(frozen=True, slots=True)
 class OptimizationResult:
     points: tuple[Point, ...]
-    moves: tuple[FaceMove | ReidemeisterMove, ...]
+    moves: tuple[FaceMove | ReidemeisterMove | CoordinateCompression | SlabContraction, ...]
     status: str
     reidemeister_rejections: tuple[MoveRejection, ...] = ()
 
@@ -73,16 +87,130 @@ def apply_face_move(points, move: FaceMove) -> tuple[Point, ...]:
     return result
 
 
-def apply_move(points, move: FaceMove | ReidemeisterMove) -> tuple[Point, ...]:
+def _corners(points):
+    """Keep cyclic turns and switch endpoints; omit collinear unit vertices."""
+    body = tuple(points)[:-1]
+    corners = []
+    for i, p in enumerate(body):
+        a, b = body[i-1], body[(i+1) % len(body)]
+        incoming = p.x-a.x, p.y-a.y, p.z-a.z
+        outgoing = b.x-p.x, b.y-p.y, b.z-p.z
+        if incoming != outgoing:
+            corners.append(p)
+    return tuple(corners)
+
+
+def coordinate_compression(points) -> CoordinateCompression:
+    """Describe a simultaneous, order-preserving compaction of both axes."""
+    validate_cycle(points).raise_for_errors()
+    corners = _corners(points)
+    return CoordinateCompression(tuple(sorted({p.x for p in corners})),
+                                 tuple(sorted({p.y for p in corners})))
+
+
+def apply_coordinate_compression(points, move: CoordinateCompression) -> tuple[Point, ...]:
+    """Recheck the global isotopy certificate and expand compact unit edges.
+
+    Every turn and switch has an active coordinate. Map consecutive active
+    levels to consecutive integers, extending between them piecewise linearly
+    and outside them by translation. These strictly increasing axis maps are
+    homeomorphisms of R. Their convex interpolation with the identity gives
+    an ambient isotopy (f_t(x), g_t(y), z), preserving every crossing and its
+    height order. Inactive collinear samples may move off the integer grid
+    during the isotopy; the final edges are subdivided into unit steps anew.
+    """
+    expected = coordinate_compression(points)
+    if move != expected:
+        raise ValueError("compression levels do not match this path")
+    corners = _corners(points)
+    x_map = {x: i for i, x in enumerate(move.x_levels)}
+    y_map = {y: i for i, y in enumerate(move.y_levels)}
+    targets = tuple(Point(x_map[p.x], y_map[p.y], p.z) for p in corners)
+    result = [targets[0]]
+    for target in targets[1:]+targets[:1]:
+        while result[-1] != target:
+            p = result[-1]
+            dx = (target.x > p.x) - (target.x < p.x)
+            dy = (target.y > p.y) - (target.y < p.y)
+            dz = (target.z > p.z) - (target.z < p.z)
+            result.append(Point(p.x+dx, p.y+dy, p.z+dz))
+    validate_cycle(result).raise_for_errors()
+    if len(result) > len(points):
+        raise ValueError("coordinate compression unexpectedly lengthened the path")
+    return tuple(result)
+
+
+def apply_slab_contraction(points, move: SlabContraction) -> tuple[Point, ...]:
+    """Contract one unit slab, rejecting every nonincident strand contact.
+
+    For t < 1 the axis map is strictly increasing: it is the identity left of
+    k, a linear compression on [k,k+1], and a translation by -t on the right.
+    At t=1 only unit edges across the slab collapse. Remove consecutive equal
+    vertices, then require a simple cycle: distinct surviving arcs may never
+    meet. Each collapsed edge is thus a subdivision contraction in a disjoint
+    strand neighborhood, so the limiting polygon has the same knot type.
+    No z coordinates or over/under choices are swapped.
+    """
+    validate_cycle(points).raise_for_errors()
+    if (move.kind != "grid_slab_contraction" or type(move.axis) is not int or move.axis not in (0, 1)
+            or type(move.coordinate) is not int):
+        raise ValueError("invalid slab contraction")
+    coordinates = [(p.x, p.y)[move.axis] for p in points]
+    if not min(coordinates) <= move.coordinate < max(coordinates):
+        raise ValueError("slab is outside the path bounds")
+    result = []
+    for p in points:
+        xyz = [p.x, p.y, p.z]
+        xyz[move.axis] -= xyz[move.axis] > move.coordinate
+        q = Point(*xyz)
+        if not result or q != result[-1]:
+            result.append(q)
+    if result[-1] != result[0]:
+        result.append(result[0])
+    validate_cycle(result).raise_for_errors()
+    return tuple(result)
+
+
+def _slab_moves(points, expired):
+    for axis in (0, 1):
+        coordinates = [(p.x, p.y)[axis] for p in points]
+        for level in range(min(coordinates), max(coordinates)):
+            if expired():
+                return
+            move = SlabContraction(axis, level)
+            try:
+                candidate = apply_slab_contraction(points, move)
+            except ValueError:
+                continue
+            if len(candidate) < len(points):
+                yield move, candidate
+
+
+def apply_move(points, move: FaceMove | ReidemeisterMove | CoordinateCompression | SlabContraction) -> tuple[Point, ...]:
     """Replay a logged face or direct Reidemeister move, rechecking geometry."""
     if move.kind == "empty_unit_face":
         return apply_face_move(points, move)
+    if move.kind == "coordinate_compression":
+        return apply_coordinate_compression(points, move)
+    if move.kind == "grid_slab_contraction":
+        return apply_slab_contraction(points, move)
     return apply_reidemeister_move(points, move)
 
 
-def move_from_dict(record: dict) -> FaceMove | ReidemeisterMove:
+def move_from_dict(record: dict) -> FaceMove | ReidemeisterMove | CoordinateCompression | SlabContraction:
     """Read either log kind from the JSON representation used by the catalog."""
     kind = record["kind"]
+    if kind == "grid_slab_contraction":
+        if (type(record.get("axis")) is not int or record["axis"] not in (0, 1)
+                or type(record.get("coordinate")) is not int):
+            raise ValueError("invalid slab contraction")
+        return SlabContraction(record["axis"], record["coordinate"])
+    if kind == "coordinate_compression":
+        if (not isinstance(record.get("x_levels"), (list, tuple))
+                or not isinstance(record.get("y_levels"), (list, tuple))
+                or any(type(v) is not int for levels in (record["x_levels"], record["y_levels"]) for v in levels)):
+            raise ValueError("compression levels must be integer sequences")
+        return CoordinateCompression(tuple(record["x_levels"]), tuple(record["y_levels"]))
     cls = FaceMove if kind == "empty_unit_face" else ReidemeisterMove
     return cls(record["start_index"], tuple(Point(**p) for p in record["before"]),
                tuple(Point(**p) for p in record["after"]), kind)
@@ -174,7 +302,7 @@ def redistribute_layers(points, *, max_moves: int = 120, max_seconds: float = 2,
 
 def optimize_cycle(points, *, max_moves: int = 100, max_route_states: int = 5000,
                    balance_layers: bool = False, max_seconds: float | None = None,
-                   candidate_filter=None) -> OptimizationResult:
+                   candidate_filter=None, compress_coordinates: bool = False) -> OptimizationResult:
     """Strictly improve (point count, canonical Cantor order) within a budget.
 
     Canonical comparison uses rotations only, so no reflection can silently
@@ -184,6 +312,8 @@ def optimize_cycle(points, *, max_moves: int = 100, max_route_states: int = 5000
     the Cantor tie-breaker, but fewer points always take precedence. A filter
     may restrict the supported output representation. max_seconds bounds an
     interactive attempt; a partial, fully certified result is returned.
+    Coordinate compression removes inactive axis spacing by a global ambient
+    isotopy, escaping local minima that cannot be shortened one face at a time.
     """
     if max_moves < 0:
         raise ValueError("max_moves must be non-negative")
@@ -209,12 +339,21 @@ def optimize_cycle(points, *, max_moves: int = 100, max_route_states: int = 5000
     for _ in range(max_moves):
         if expired():
             return OptimizationResult(current, tuple(log), "time_limit")
+        if compress_coordinates:
+            compression = coordinate_compression(current)
+            compacted = apply_coordinate_compression(current, compression)
+            if (len(compacted) < len(current)
+                    and (candidate_filter is None or candidate_filter(compacted))):
+                current = compacted
+                log.append(compression)
+                continue
         measure = measure_of(current)
         best = None
         best_measure = measure
         analysis = analyze_reidemeister_moves(current, max_route_states=max_route_states)
         candidates = ((move, apply_reidemeister_move(current, move)) for move in analysis.moves)
-        for move, candidate in chain(candidates, _moves(current)):
+        slab_moves = _slab_moves(current, expired) if compress_coordinates else ()
+        for move, candidate in chain(slab_moves, candidates, _moves(current)):
             if expired():
                 break
             if candidate_filter is not None and not candidate_filter(candidate):
