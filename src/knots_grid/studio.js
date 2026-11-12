@@ -31,7 +31,7 @@ function updateControls() {
   const random = preset === "travel" || preset === "ornamental";
   $("seed").disabled = !random;
   $("random-seed").disabled = !random || busy;
-  $("minimize").disabled = busy || !record;
+  $("minimize").disabled = busy || !record || minimizedRecord?.optimization.status === "global_minimum";
   $("show-original").disabled = busy;
   $("show-result").disabled = busy;
   $("preset-help").textContent = descriptions[preset];
@@ -116,7 +116,10 @@ function showRecord(data) {
       evidence += ` ${data.metrics.degeneracies} Projektionsentartungen; der räumliche Pfad bleibt gültig.`;
     }
     if (data.optimization) {
-      evidence = "Der Knotentyp bleibt durch geometrisch geprüfte, protokollierte Umformungen erhalten. Eine globale Minimalität ist nicht bewiesen.";
+      evidence = "Der Knotentyp bleibt durch geometrisch geprüfte, protokollierte Umformungen erhalten. " +
+        (data.optimization.status === "global_minimum"
+          ? "Vier Schritte sind der kleinste mögliche einfache Gitterzyklus."
+          : "Eine globale Minimalität ist nicht bewiesen.");
     } else if (data.parameters.preset === "travel" && data.parameters.crossing_mode === "mixed") {
       evidence += " Freie Kreuzungsführung mit lokalen Überführungen auf einem vierfach verfeinerten Gitter.";
     }
@@ -161,6 +164,7 @@ async function minimize() {
     const details = data.optimization;
     const originalLength = generatedRecord.metrics.length;
     const endings = {
+      global_minimum: "Minimaler Gitterzyklus erreicht: Weniger als vier Schritte sind nicht möglich.",
       local_minimum: "Keine weitere Verkürzung durch Gitterverdichtung und die unterstützten lokalen Züge gefunden. Das beweist keine kürzestmögliche Darstellung.",
       move_limit: "Zuglimit erreicht. Mit einem weiteren Versuch fortsetzen.",
       time_limit: "Zeitlimit erreicht. Mit einem weiteren Versuch fortsetzen.",
@@ -177,7 +181,9 @@ async function minimize() {
   } finally {
     busy = false;
     $("generate").disabled = false;
-    $("minimize").textContent = minimizedRecord ? "Weiter minimieren" : "Minimierung versuchen";
+    $("minimize").textContent = minimizedRecord
+      ? (minimizedRecord.optimization.status === "global_minimum" ? "Minimum erreicht" : "Weiter minimieren")
+      : "Minimierung versuchen";
     $("viewer").setAttribute("aria-busy", "false");
     updateControls();
   }

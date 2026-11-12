@@ -10,6 +10,7 @@ from knots_grid.studio import StudioHandler, StudioServer, generate_record, mini
 from knots_grid.optimization import apply_move, layer_lengths, move_from_dict, optimize_cycle, redistribute_layers
 from knots_grid.classification import signed_gauss_key
 from knots_grid.catalog import canonicalize_cycle, sequence_measure
+from knots_grid.studio_optimization import apply_turtle_normalization, encode_cycle
 
 
 class StudioGenerationTests(unittest.TestCase):
@@ -157,13 +158,8 @@ class StudioMinimizationTests(unittest.TestCase):
             self.assertTrue(validate_cycle(after).is_valid)
             self.assertLess(objective(after), objective(points))
             points = after
-        transform = result["optimization"]["normalization"]
-        i = transform["cyclic_start"]
-        x, y, z = transform["origin"]
-        dx, dy = transform["east"]
-        body = points[:-1]
-        normalized = [[dx*(p.x-x)+dy*(p.y-y), -dy*(p.x-x)+dx*(p.y-y), p.z-z]
-                      for p in body[i:] + body[:i] + (body[i],)]
+        transformed = apply_turtle_normalization(points, result["optimization"]["normalization"])
+        normalized = [[p.x,p.y,p.z] for p in transformed]
         self.assertEqual(normalized, result["points"])
         self.assertEqual(trace_turtle(result["code"]).points, tuple(Point(*p) for p in normalized))
         self.assertEqual(result["classification"]["determinant"], original["classification"]["determinant"])
@@ -221,6 +217,52 @@ class StudioMinimizationTests(unittest.TestCase):
         self.assertEqual(result.status, "time_limit")
         self.assertEqual(result.points, points)
         self.assertFalse(result.moves)
+
+    def test_reported_six_edge_unknot_reduces_to_the_minimal_four_edge_cycle(self):
+        points = trace_turtle("023223").points
+        record = minimize_record({"points": [[p.x,p.y,p.z] for p in points]})
+        self.assertEqual(record["metrics"]["length"], 4)
+        self.assertEqual(record["optimization"]["status"], "global_minimum")
+        self.assertEqual(record["name"], "0_1")
+        self.assertEqual(record["classification"]["determinant"], 1)
+        self.assertTrue(set(record["code"]) <= set("0123"))
+        replay = points
+        for move in record["optimization"]["moves"]:
+            replay = apply_move(replay, move_from_dict(move))
+        normalized = apply_turtle_normalization(replay, record["optimization"]["normalization"])
+        self.assertEqual(normalized, trace_turtle(record["code"]).points)
+        self.assertEqual(normalized, tuple(Point(*p) for p in record["points"]))
+
+    def test_six_edge_unknot_minimizes_for_each_cyclic_start_and_traversal(self):
+        body = trace_turtle("023223").points[:-1]
+        for oriented in (body, tuple(reversed(body))):
+            for i in range(len(body)):
+                with self.subTest(reverse=oriented != body, start=i):
+                    cycle = oriented[i:]+oriented[:i]+(oriented[i],)
+                    shifted = [[p.x+7,p.y-4,p.z] for p in cycle]
+                    record = minimize_record({"points": shifted})
+                    self.assertEqual(record["metrics"]["length"], 4)
+                    self.assertEqual(record["optimization"]["status"], "global_minimum")
+
+    def test_vertical_rectangle_is_encodable_by_proper_spatial_rotation(self):
+        points = (Point(0,0,0),Point(0,1,0),Point(0,1,1),Point(0,0,1),Point(0,0,0))
+        trace, transform = encode_cycle(points)
+        self.assertIn("matrix", transform)
+        self.assertEqual(apply_turtle_normalization(points, transform), trace.points)
+        self.assertEqual(len(trace.code), 4)
+        self.assertTrue(validate_cycle(trace.points).is_valid)
+        self.assertEqual({p.z for p in trace.points}, {0})
+
+    def test_normalization_rejects_reflections_scaling_and_height_overflow(self):
+        points = trace_turtle("0111").points
+        for matrix in ([[-1,0,0],[0,1,0],[0,0,1]], [[2,0,0],[0,1,0],[0,0,1]], None):
+            with self.subTest(matrix=matrix):
+                with self.assertRaises(ValueError):
+                    apply_turtle_normalization(points, {"cyclic_start": 0,"origin": [0,0,0],"matrix": matrix})
+        wide = trace_turtle("001001001001").points
+        with self.assertRaises(ValueError):
+            apply_turtle_normalization(wide, {"cyclic_start": 0,"origin": [0,0,0],
+                                             "matrix": [[0,1,0],[0,0,1],[1,0,0]]})
 
 
 if __name__ == "__main__":

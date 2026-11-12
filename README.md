@@ -51,7 +51,12 @@ ein anderer Port wählen; **Strg+C** im Serverfenster beendet ihn.
   Eingangspunkte, alle erneut geometrisch prüfbaren Züge und die anschließende
   Verschiebung/Drehung zum Turtle-Start. Die Exporte gehören immer zur gerade
   angezeigten Variante. Die Suche behält nur im Turtle-Format darstellbare
-  Kandidaten bei.
+  Kandidaten bei. Die Normalisierung darf dafür zusätzlich räumliche Drehungen
+  ohne Spiegelung verwenden, wenn der gedrehte Pfad weiterhin höchstens zwei
+  benachbarte Ebenen belegt. Ein senkrechtes Vierer-Rechteck kann so als flaches
+  Vierer-Quadrat codiert werden. Solche Drehungen werden im JSON als 3×3-Matrix
+  protokolliert. Bei genau vier Schritten meldet die Oberfläche ausdrücklich
+  **Minimum erreicht**, da kein einfacher Gitterzyklus kürzer sein kann.
 
 Jeder Pfad wird vor der Anzeige validiert. Zufällige Kandidaten können Unknoten
 sein oder ungeklärt bleiben; die Determinante allein bestimmt keinen Knotentyp.
