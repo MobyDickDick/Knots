@@ -1,5 +1,39 @@
 # Knoten und Gitterdiagramme
 
+## Interaktiver Knotengenerator
+
+Unter Windows startet ein Doppelklick auf **`start_generator.cmd`** den lokalen
+Generator und öffnet ihn im Browser. Voraussetzung ist Python ab Version 3.10;
+zusätzliche Pakete oder eine Internetverbindung sind nicht erforderlich.
+
+Alternativ nach `python -m pip install -e .`:
+
+```bash
+python -m knots_grid.studio --open
+```
+
+Der Generator läuft unter `http://127.0.0.1:8765`. Mit `--port 8766` lässt sich
+ein anderer Port wählen; **Strg+C** im Serverfenster beendet ihn.
+
+- Kleeblatt-, Achter- und Torusknoten als feste Referenzdiagramme auswählen.
+- Zufällige Gitterkandidaten mit 4–24 Markerpaaren oder ornamentale Unknoten
+  mit bis zu 60 Suchschritten erzeugen. Seeds bleiben bis `2^63 - 1` exakt und
+  liefern mit denselben Parametern reproduzierbare Ergebnisse.
+- Zwischen der verschobenen 2-D-Gitterprojektion und der drehbaren 3-D-Ansicht
+  wechseln. In 3-D mit Maus/Touch ziehen oder die Pfeiltasten verwenden;
+  Mausrad sowie `+`/`-` zoomen und `Home` setzt die Ansicht zurück.
+  Der Ebenenabstand in 3-D ist nur für die Anzeige überhöht.
+- SVG, JSON mit Punkten/Parametern/Kennzahlen und Turtle-Code herunterladen.
+  Die SVG-Datei zeigt stets die exakte 2-D-Gitterprojektion.
+
+Jeder Pfad wird vor der Anzeige validiert. Zufällige Kandidaten können Unknoten
+sein oder ungeklärt bleiben; die Determinante allein bestimmt keinen Knotentyp.
+Die Kreuzungszahl bezieht sich auf das gezeigte Diagramm und ist nicht zwingend
+minimal. Das JSON verwendet die Konvention von `knots_grid`: **Der Startpunkt
+wird am Ende wiederholt.** Der Turtle-Code rekonstruiert diese Punkte exakt mit
+Start `(0,0,0)` und Richtung Ost. Die Oberfläche arbeitet ausschließlich lokal
+und verwendet den vorhandenen Python-Kern.
+
 Dieses Repository enthält drei Bausteine für zyklische Punktmengen in
 `Z^2 x {0, 1}`.  Ein Knoten wird als Turtle-Step-Zyklus gespeichert: Jeder
 Nachbarpunkt unterscheidet sich um genau einen Gitter-Schritt, der letzte Punkt

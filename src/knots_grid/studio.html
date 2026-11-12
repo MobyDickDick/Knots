@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Ein lokales Labor für geprüfte Knoten im zweischichtigen Gitter.">
+  <title>Knotenwerk · Knotengenerator</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/studio.css">
+  <script src="/studio.js" defer></script>
+</head>
+<body>
+  <header class="header">
+    <a class="brand" href="/" aria-label="Knotenwerk Startseite">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M12 28C-2 22 10 6 20 14S39 24 29 30 12 19 19 9 34 12 28 19 5 37 8 21"/></svg>
+      <span>Knotenwerk<span class="brand-sub">GITTER & GEOMETRIE</span></span>
+    </a>
+    <span class="local"><i></i> Lokal auf deinem Rechner</span>
+  </header>
+  <main>
+    <div class="intro"><div><p class="eyebrow">DAS KLEINE KNOTENLABOR</p><h1>Knotengenerator<span>.</span></h1>
+      <p class="intro-copy">Geschlossene Wege erzeugen. Ebenen wechseln. Zusammenhänge entdecken.</p></div>
+      <span class="formula" aria-label="Ganzzahliges zweidimensionales Gitter mit zwei Ebenen">ℤ² × {0, 1}</span>
+    </div>
+    <div class="workspace">
+      <aside class="controls">
+        <div class="section-label"><span>01</span> Konstruktion</div>
+        <form id="generator-form">
+          <label for="preset">Knotenfamilie</label>
+          <select id="preset" name="preset">
+            <option value="trefoil">Kleeblatt · T(2,3)</option>
+            <option value="figure-eight">Achterknoten · 4₁</option>
+            <option value="torus">Torusknoten · T(2,q)</option>
+            <option value="travel">Zufälliger Gitterkandidat</option>
+            <option value="ornamental">Ornamentaler Unknoten</option>
+          </select>
+          <p class="field-help" id="preset-help">Der klassische Kleeblattknoten als geprüftes 5 × 5-Gitterdiagramm.</p>
+          <div id="travel-options" hidden>
+            <div class="range-label"><label for="point-count">Markerpaare</label><output id="point-count-value" for="point-count">10</output></div>
+            <input id="point-count" type="range" min="4" max="24" value="10">
+            <p class="field-help">Mehr Marker lassen komplexere Wege zu. Der Knotentyp kann ungeklärt bleiben.</p>
+          </div>
+          <div id="torus-options" hidden>
+            <div class="range-label"><label for="crossings">Kreuzungen q</label><output id="crossings-value" for="crossings">5</output></div>
+            <input id="crossings" type="range" min="3" max="15" step="2" value="5">
+            <p class="field-help">Ungerade Kreuzungszahlen erzeugen die Familie T(2,q).</p>
+          </div>
+          <div id="ornamental-options" hidden>
+            <div class="range-label"><label for="steps">Suchschritte</label><output id="steps-value" for="steps">18</output></div>
+            <input id="steps" type="range" min="0" max="60" value="18">
+            <p class="field-help">Lokale Umwege verändern die Form und erhalten den Unknotentyp.</p>
+          </div>
+          <label for="seed">Seed <span class="optional">/ reproduzierbar</span></label>
+          <div class="seed-row"><input id="seed" name="seed" type="text" inputmode="numeric" pattern="[0-9]{1,19}" maxlength="19" value="2026" autocomplete="off" required><button type="button" id="random-seed" title="Neuen zufälligen Seed wählen" aria-label="Zufälligen Seed wählen">↻</button></div>
+          <p class="field-help" id="seed-help">Referenzdiagramme sind fest; sie benötigen keinen Seed.</p>
+          <button class="primary" id="generate" type="submit"><span>Knoten erzeugen</span><span aria-hidden="true">↗</span></button>
+          <p id="error" class="error" role="alert" hidden></p>
+        </form>
+        <div class="model-note"><span class="mini-knot">∞</span><h2>Ein Weg, zwei Ebenen.</h2><p>Jeder Knoten ist ein geschlossener Gitterpfad. Kein räumlicher Punkt wird doppelt belegt.</p><p>Blau liegt unten, Grün liegt oben. Rot verbindet die Ebenen.</p></div>
+      </aside>
+      <section class="result" aria-label="Erzeugter Knoten">
+        <div class="viewer" id="viewer">
+          <div class="viewer-top"><div class="view-tabs" role="group" aria-label="Darstellung"><button type="button" id="view-2d" aria-pressed="true">2-D Gitter</button><button type="button" id="view-3d" aria-pressed="false">3-D Raum</button></div><span class="valid-badge" id="valid-badge">Wird erzeugt …</span></div>
+          <canvas id="knot-canvas" tabindex="0" role="img" aria-label="Knotendarstellung. In 3-D mit der Maus ziehen oder Pfeiltasten zum Drehen verwenden."></canvas>
+          <div class="viewer-bottom"><div><span class="viewer-eyebrow">AKTUELLE KONSTRUKTION</span><h2 id="knot-name">Kleeblattknoten</h2></div><button id="reset-view" type="button" title="Ansicht zurücksetzen">↺ <span>Ansicht zurücksetzen</span></button></div>
+          <span class="interaction-hint" id="interaction-hint">Obere Ebene diagonal um √2/2 versetzt</span>
+        </div>
+        <div class="metrics" aria-live="polite" aria-atomic="true">
+          <div><span class="metric-label">Gitterpunkte</span><strong id="metric-length">—</strong><span class="metric-detail">ohne doppelten Startpunkt</span></div>
+          <div><span class="metric-label">Kreuzungen</span><strong id="metric-crossings">—</strong><span class="metric-detail">in der flachen Projektion</span></div>
+          <div><span class="metric-label">Ebenenwechsel</span><strong id="metric-switches">—</strong><span class="metric-detail">zwischen z = 0 und z = 1</span></div>
+          <div><span class="metric-label">Determinante</span><strong id="metric-determinant">—</strong><span class="metric-detail" id="classification">Klassifikation wird geprüft</span></div>
+        </div>
+      </section>
+    </div>
+    <section class="data-panel">
+      <div class="data-heading"><div class="section-label"><span>02</span> Mitnehmen & weiterdenken</div><div class="exports"><button id="download-svg" disabled>↓ SVG</button><button id="download-json" disabled>↓ JSON</button><button id="download-code" disabled>↓ Turtle-Code</button></div></div>
+      <div class="code-row"><div><span class="metric-label">TURTLE-CODE</span><p>0 vorwärts · 1 links · 2 rechts · 3 Ebene wechseln</p></div><code id="turtle-code">…</code><button id="copy-code" type="button" disabled>Kopieren</button></div>
+      <p class="evidence" id="evidence">Jeder erzeugte Pfad wird vor der Anzeige validiert.</p>
+    </section>
+    <noscript>Bitte JavaScript aktivieren, um Knoten zu erzeugen und die Ansichten zu bedienen.</noscript>
+  </main>
+  <footer><span>Knotenwerk <span class="footer-dot">·</span> Ein Experiment in diskreter Geometrie</span><span>Python-Kern. Exakte Punkte. Lokale Berechnung.</span></footer>
+  <div class="sr-only" id="status" role="status" aria-live="polite"></div>
+</body>
+</html>

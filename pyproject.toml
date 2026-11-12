@@ -17,4 +17,4 @@ authors = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-knots_grid = ["gallery.html.template", "image_tracer.html"]
+knots_grid = ["gallery.html.template", "image_tracer.html", "studio.html", "studio.css", "studio.js"]
