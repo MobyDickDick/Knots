@@ -6,6 +6,8 @@ const ctx = canvas.getContext("2d");
 const background = "#142b2d";
 const colors = ["#78b5e0", "#8fcfb1", "#ef956e"];
 let record = null;
+let generatedRecord = null;
+let minimizedRecord = null;
 let view = "2d";
 let yaw = -0.55;
 let pitch = 0.95;
@@ -29,6 +31,9 @@ function updateControls() {
   const random = preset === "travel" || preset === "ornamental";
   $("seed").disabled = !random;
   $("random-seed").disabled = !random || busy;
+  $("minimize").disabled = busy || !record;
+  $("show-original").disabled = busy;
+  $("show-result").disabled = busy;
   $("preset-help").textContent = descriptions[preset];
   $("seed-help").textContent = random
     ? "Gleicher Seed + gleiche Parameter = derselbe Weg."
@@ -53,6 +58,7 @@ async function generate(event) {
   $("generate").firstElementChild.textContent = "Wird erzeugt …";
   $("random-seed").disabled = true;
   $("viewer").setAttribute("aria-busy", "true");
+  updateControls();
   const options = {
     preset: $("preset").value,
     seed: ["travel", "ornamental"].includes($("preset").value) ? $("seed").value : "2026",
@@ -68,6 +74,25 @@ async function generate(event) {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Der Knoten konnte nicht erzeugt werden.");
+    generatedRecord = data;
+    minimizedRecord = null;
+    $("optimization-panel").hidden = true;
+    $("minimize").textContent = "Minimierung versuchen";
+    showRecord(data);
+    $("status").textContent = `${displayName(data)} erzeugt: ${data.metrics.length} Punkte, ${data.metrics.crossings} Kreuzungen.`;
+  } catch (error) {
+    showError(error);
+    if (!record) $("valid-badge").textContent = "Keine Konstruktion geladen";
+  } finally {
+    busy = false;
+    $("generate").disabled = false;
+    $("generate").firstElementChild.textContent = "Knoten erzeugen";
+    $("viewer").setAttribute("aria-busy", "false");
+    updateControls();
+  }
+}
+
+function showRecord(data) {
     record = data;
     $("knot-name").textContent = displayName(data);
     $("valid-badge").textContent = "✓ Geschlossen & geprüft";
@@ -90,7 +115,9 @@ async function generate(event) {
     if (data.metrics.degeneracies) {
       evidence += ` ${data.metrics.degeneracies} Projektionsentartungen; der räumliche Pfad bleibt gültig.`;
     }
-    if (data.parameters.preset === "travel" && data.parameters.crossing_mode === "mixed") {
+    if (data.optimization) {
+      evidence = "Der Knotentyp bleibt durch geometrisch geprüfte, protokollierte Umformungen erhalten. Eine globale Minimalität ist nicht bewiesen.";
+    } else if (data.parameters.preset === "travel" && data.parameters.crossing_mode === "mixed") {
       evidence += " Freie Kreuzungsführung mit lokalen Überführungen auf einem vierfach verfeinerten Gitter.";
     }
     evidence += " JSON enthält den Startpunkt am Ende erneut; der Turtle-Code startet in (0,0,0) nach Osten.";
@@ -99,19 +126,57 @@ async function generate(event) {
     }
     $("evidence").textContent = evidence;
     for (const id of ["download-svg", "download-json", "download-code", "copy-code"]) $(id).disabled = false;
-    $("status").textContent = `${displayName(data)} erzeugt: ${data.metrics.length} Punkte, ${data.metrics.crossings} Kreuzungen.`;
+    $("show-original").setAttribute("aria-pressed", String(data === generatedRecord));
+    $("show-result").setAttribute("aria-pressed", String(data === minimizedRecord));
     resetView();
-  } catch (error) {
+}
+
+function showError(error) {
     $("error").textContent = error instanceof TypeError
       ? "Der lokale Generator ist nicht erreichbar. Bitte start_generator.cmd erneut starten."
       : error.message;
     $("error").hidden = false;
-    if (!record) $("valid-badge").textContent = "Keine Konstruktion geladen";
-    $("status").textContent = "Der Knoten konnte nicht erzeugt werden.";
+    $("status").textContent = $("error").textContent;
+}
+
+async function minimize() {
+  if (busy || !record) return;
+  const input = minimizedRecord || generatedRecord;
+  busy = true;
+  $("error").hidden = true;
+  $("generate").disabled = true;
+  $("minimize").textContent = "Minimierung läuft …";
+  $("viewer").setAttribute("aria-busy", "true");
+  $("status").textContent = "Der aktuelle Knoten wird verkürzt und auf beide Ebenen verteilt. Ein Versuch dauert etwa acht Sekunden.";
+  updateControls();
+  try {
+    const response = await fetch("/api/minimize", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ points: input.points, parameters: input.parameters }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Die Minimierung ist fehlgeschlagen.");
+    minimizedRecord = data;
+    showRecord(data);
+    const details = data.optimization;
+    const originalLength = generatedRecord.metrics.length;
+    const endings = {
+      local_minimum: "Keine weitere Verbesserung mit den unterstützten lokalen Zügen gefunden.",
+      move_limit: "Zuglimit erreicht. Mit einem weiteren Versuch fortsetzen.",
+      time_limit: "Zeitlimit erreicht. Mit einem weiteren Versuch fortsetzen.",
+      redistributed: "Ebenenverteilung verbessert. Ein weiterer Versuch kann neue Verkürzungen finden.",
+    };
+    $("optimization-summary").textContent = `${originalLength} → ${data.metrics.length} Punkte · ${originalLength - data.metrics.length} entfernt. Letzter Versuch: ${details.move_count} Umformungen. ${endings[details.status] || details.status}`;
+    const before = generatedRecord.layer_lengths, after = data.layer_lengths;
+    $("layer-summary").textContent = `Fadenlänge unten / oben: ${before[0]} / ${before[1]} → ${after[0]} / ${after[1]} Gitterschritte. Kürzere Wege haben Vorrang; bei gleicher Länge wird eine gleichmäßigere Verteilung bevorzugt.`;
+    $("optimization-panel").hidden = false;
+    $("status").textContent = $("optimization-summary").textContent;
+  } catch (error) {
+    showError(error);
   } finally {
     busy = false;
     $("generate").disabled = false;
-    $("generate").firstElementChild.textContent = "Knoten erzeugen";
+    $("minimize").textContent = minimizedRecord ? "Weiter minimieren" : "Minimierung versuchen";
     $("viewer").setAttribute("aria-busy", "false");
     updateControls();
   }
@@ -233,6 +298,9 @@ function download(content, type, extension) {
 }
 
 $("generator-form").addEventListener("submit", generate);
+$("minimize").addEventListener("click", minimize);
+$("show-original").addEventListener("click", () => generatedRecord && showRecord(generatedRecord));
+$("show-result").addEventListener("click", () => minimizedRecord && showRecord(minimizedRecord));
 $("preset").addEventListener("change", updateControls);
 for (const id of ["point-count", "crossings", "steps"]) {
   $(id).addEventListener("input", () => $(`${id}-value`).textContent = $(id).value);

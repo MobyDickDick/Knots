@@ -54,6 +54,8 @@
           <div class="seed-row"><input id="seed" name="seed" type="text" inputmode="numeric" pattern="[0-9]{1,19}" maxlength="19" value="2026" autocomplete="off" required><button type="button" id="random-seed" title="Neuen zufälligen Seed wählen" aria-label="Zufälligen Seed wählen">↻</button></div>
           <p class="field-help" id="seed-help">Referenzdiagramme sind fest; sie benötigen keinen Seed.</p>
           <button class="primary" id="generate" type="submit"><span>Knoten erzeugen</span><span aria-hidden="true">↗</span></button>
+          <button class="secondary" id="minimize" type="button" disabled>Minimierung versuchen</button>
+          <p class="field-help minimize-help">Verkürzen und die Fadenlänge auf beide Ebenen verteilen. Begrenzte lokale Suche; kein Beweis eines globalen Minimums.</p>
           <p id="error" class="error" role="alert" hidden></p>
         </form>
         <div class="model-note"><span class="mini-knot">∞</span><h2>Ein Weg, zwei Ebenen.</h2><p>Jeder Knoten ist ein geschlossener Gitterpfad. Kein räumlicher Punkt wird doppelt belegt.</p><p>Blau liegt unten, Grün liegt oben. Rot verbindet die Ebenen.</p></div>
@@ -70,6 +72,11 @@
           <div><span class="metric-label">Kreuzungen</span><strong id="metric-crossings">—</strong><span class="metric-detail">in der flachen Projektion</span></div>
           <div><span class="metric-label">Ebenenwechsel</span><strong id="metric-switches">—</strong><span class="metric-detail">zwischen z = 0 und z = 1</span></div>
           <div><span class="metric-label">Determinante</span><strong id="metric-determinant">—</strong><span class="metric-detail" id="classification">Klassifikation wird geprüft</span></div>
+        </div>
+        <div class="optimization-panel" id="optimization-panel" hidden>
+          <div class="optimization-heading"><strong>Minimierungsversuch</strong><div class="comparison" role="group" aria-label="Original und Ergebnis vergleichen"><button id="show-original" type="button" aria-pressed="false">Original</button><button id="show-result" type="button" aria-pressed="true">Ergebnis</button></div></div>
+          <p id="optimization-summary" role="status"></p>
+          <p id="layer-summary"></p>
         </div>
       </section>
     </div>

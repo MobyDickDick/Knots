@@ -11,6 +11,9 @@ provided by reidemeister_moves; the same strict objective applies to both.
 """
 
 from dataclasses import dataclass
+from itertools import chain
+from math import isfinite
+from time import monotonic
 
 from .catalog import canonicalize_cycle, sequence_measure
 from .core import Point
@@ -110,36 +113,123 @@ def _moves(points):
                 yield move, result
 
 
-def optimize_cycle(points, *, max_moves: int = 100, max_route_states: int = 5000) -> OptimizationResult:
+def layer_lengths(points) -> tuple[int, int]:
+    """Count planar unit edges on each layer, excluding vertical switches."""
+    lengths = [0, 0]
+    for a, b in zip(points, points[1:]):
+        if a.z == b.z:
+            lengths[a.z] += 1
+    return tuple(lengths)
+
+
+def redistribute_layers(points, *, max_moves: int = 120, max_seconds: float = 2,
+                        candidate_filter=None) -> OptimizationResult:
+    """Slide switches across empty vertical faces without lengthening the knot.
+
+    Each accepted 2->2 move transfers one planar edge to the less-used layer.
+    Flat geometry and crossing order stay fixed; the occupied-vertex check
+    prevents sliding a switch across another strand. This greedy phase ends
+    at equal lengths, a blocked switch, or the supplied budget.
+    """
+    if type(max_moves) is not int or max_moves < 0:
+        raise ValueError("max_moves must be a non-negative integer")
+    if not isfinite(max_seconds) or max_seconds <= 0:
+        raise ValueError("max_seconds must be positive and finite")
+    current = tuple(points)
+    validate_cycle(current).raise_for_errors()
+    deadline = monotonic() + max_seconds
+    log = []
+    for _ in range(max_moves):
+        low, high = layer_lengths(current)
+        if abs(low-high) <= 1:
+            return OptimizationResult(current, tuple(log), "balanced")
+        majority = 0 if low > high else 1
+        body = current[:-1]
+        occupied = set(body)
+        accepted = None
+        for i, a in enumerate(body):
+            if monotonic() >= deadline:
+                return OptimizationResult(current, tuple(log), "time_limit")
+            b, c = body[(i+1) % len(body)], body[(i+2) % len(body)]
+            if a.z == c.z:
+                continue
+            planar_layer = a.z if a.z == b.z else b.z
+            if planar_layer != majority:
+                continue
+            corner = Point(a.x+c.x-b.x, a.y+c.y-b.y, a.z+c.z-b.z)
+            before, after = (a, b, c), (a, corner, c)
+            if corner in occupied or not _face_boundary(before, after):
+                continue
+            move = FaceMove(i, before, after)
+            candidate = apply_face_move(current, move)
+            if candidate_filter is None or candidate_filter(candidate):
+                accepted = move, candidate
+                break
+        if accepted is None:
+            return OptimizationResult(current, tuple(log), "layer_local_minimum")
+        move, current = accepted
+        log.append(move)
+    return OptimizationResult(current, tuple(log), "move_limit")
+
+
+def optimize_cycle(points, *, max_moves: int = 100, max_route_states: int = 5000,
+                   balance_layers: bool = False, max_seconds: float | None = None,
+                   candidate_filter=None) -> OptimizationResult:
     """Strictly improve (point count, canonical Cantor order) within a budget.
 
     Canonical comparison uses rotations only, so no reflection can silently
     change the knot's chirality. Returned coordinates retain the exact move
     endpoints, allowing replay from the unmodified original.
+    With balance_layers, the difference in planar lengths is minimized before
+    the Cantor tie-breaker, but fewer points always take precedence. A filter
+    may restrict the supported output representation. max_seconds bounds an
+    interactive attempt; a partial, fully certified result is returned.
     """
     if max_moves < 0:
         raise ValueError("max_moves must be non-negative")
     if type(max_route_states) is not int or max_route_states < 1:
         raise ValueError("max_route_states must be a positive integer")
+    if max_seconds is not None and (not isfinite(max_seconds) or max_seconds <= 0):
+        raise ValueError("max_seconds must be positive and finite")
+    deadline = None if max_seconds is None else monotonic() + max_seconds
+
+    def expired():
+        return deadline is not None and monotonic() >= deadline
+
+    def measure_of(path):
+        count, cantor = sequence_measure(canonicalize_cycle(path, include_reflections=False)[:-1])
+        if balance_layers:
+            lower, upper = layer_lengths(path)
+            return count, abs(lower - upper), cantor
+        return count, cantor
+
     current = tuple(points)
     validate_cycle(current).raise_for_errors()
     log = []
     for _ in range(max_moves):
-        measure = sequence_measure(canonicalize_cycle(current, include_reflections=False)[:-1])
+        if expired():
+            return OptimizationResult(current, tuple(log), "time_limit")
+        measure = measure_of(current)
         best = None
         best_measure = measure
         analysis = analyze_reidemeister_moves(current, max_route_states=max_route_states)
-        candidates = [(move, apply_reidemeister_move(current, move)) for move in analysis.moves]
-        for move, candidate in (*candidates, *_moves(current)):
-            candidate_measure = sequence_measure(
-                canonicalize_cycle(candidate, include_reflections=False)[:-1])
+        candidates = ((move, apply_reidemeister_move(current, move)) for move in analysis.moves)
+        for move, candidate in chain(candidates, _moves(current)):
+            if expired():
+                break
+            if candidate_filter is not None and not candidate_filter(candidate):
+                continue
+            candidate_measure = measure_of(candidate)
             if candidate_measure < best_measure:
                 best = move, candidate
                 best_measure = candidate_measure
         if best is None:
-            return OptimizationResult(current, tuple(log), "local_minimum", analysis.rejections)
+            return OptimizationResult(current, tuple(log), "time_limit" if expired() else "local_minimum",
+                                      analysis.rejections)
         move, current = best
         log.append(move)
+        if expired():
+            return OptimizationResult(current, tuple(log), "time_limit")
     rejections = (analyze_reidemeister_moves(current, max_route_states=max_route_states).rejections
-                  if log else ())
+                  if log and deadline is None else ())
     return OptimizationResult(current, tuple(log), "move_limit", rejections)

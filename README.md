@@ -30,6 +30,21 @@ ein anderer Port wählen; **Strg+C** im Serverfenster beendet ihn.
   Der Ebenenabstand in 3-D ist nur für die Anzeige überhöht.
 - SVG, JSON mit Punkten/Parametern/Kennzahlen und Turtle-Code herunterladen.
   Die SVG-Datei zeigt stets die exakte 2-D-Gitterprojektion.
+- **Minimierung versuchen** bearbeitet den gerade erzeugten Knoten mit
+  geometrisch geprüften Flächen- und Reidemeister-Zügen. Zuerst zählt eine
+  kleinere Punktzahl; bei gleicher Länge wird eine gleichmäßigere Fadenlänge
+  auf beiden Ebenen bevorzugt. Ebenenwechsel werden dabei kollisionsfrei
+  verschoben, statt die Über-/Unterwahl beliebig neu auszulosen.
+- Jeder Versuch läuft höchstens ungefähr acht Sekunden bzw. 120 Züge.
+  **Weiter minimieren** setzt beim letzten Ergebnis an. **Original / Ergebnis**
+  vergleicht beide Darstellungen in 2-D und 3-D. Die Anzeige nennt Punktzahlen,
+  die Fadenlänge je Ebene und den Abbruchgrund. Ein globales Minimum oder eine
+  optimal ausgeglichene Ebenenverteilung wird nicht behauptet.
+- Beim Export des Ergebnisses enthält das JSON unter `optimization` die
+  Eingangspunkte, alle erneut geometrisch prüfbaren Züge und die anschließende
+  Verschiebung/Drehung zum Turtle-Start. Die Exporte gehören immer zur gerade
+  angezeigten Variante. Die Suche behält nur im Turtle-Format darstellbare
+  Kandidaten bei.
 
 Jeder Pfad wird vor der Anzeige validiert. Zufällige Kandidaten können Unknoten
 sein oder ungeklärt bleiben; die Determinante allein bestimmt keinen Knotentyp.

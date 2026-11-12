@@ -18,6 +18,8 @@ from .generator import (
     torus_knot_candidate, travel_candidate, trefoil_candidate,
 )
 from .projection import score_projection
+from .optimization import layer_lengths
+from .studio_optimization import minimize_points
 from .svg import render_svg
 from .validator import validate_cycle
 
@@ -41,8 +43,7 @@ def _integer(value, label: str, minimum: int, maximum: int) -> int:
     return number
 
 
-def generate_record(options: dict) -> dict:
-    """Generate, validate and describe a cycle. Seeds remain exact strings in JS."""
+def _parameters(options: dict) -> dict:
     if not isinstance(options, dict):
         raise ValueError("Die Parameter müssen ein JSON-Objekt sein.")
     if set(options) - {"preset", "seed", "point_count", "crossings", "steps", "crossing_mode"}:
@@ -59,21 +60,34 @@ def generate_record(options: dict) -> dict:
     crossing_mode = options.get("crossing_mode", "mixed")
     if crossing_mode not in ("grid", "mixed"):
         raise ValueError("Die Kreuzungsführung muss 'grid' oder 'mixed' sein.")
+    return {"preset": preset, "seed": str(seed), "point_count": size,
+            "crossings": crossings, "steps": steps,
+            "crossing_mode": crossing_mode if preset == "travel" else "grid"}
+
+
+def generate_record(options: dict) -> dict:
+    """Generate, validate and describe a cycle. Seeds remain exact strings in JS."""
+    parameters = _parameters(options)
+    preset, seed = parameters["preset"], int(parameters["seed"])
 
     if preset == "trefoil":
         candidate = trefoil_candidate()
     elif preset == "figure-eight":
         candidate = figure_eight_candidate()
     elif preset == "torus":
-        candidate = torus_knot_candidate(crossings)
+        candidate = torus_knot_candidate(parameters["crossings"])
     elif preset == "travel":
-        candidate = travel_candidate(seed=seed, config=TravelConfig(point_count=size),
-                                     crossing_mode=crossing_mode)
+        candidate = travel_candidate(seed=seed, config=TravelConfig(point_count=parameters["point_count"]),
+                                     crossing_mode=parameters["crossing_mode"])
     else:
         candidate = search_candidate(seed=seed, config=SearchConfig(
-            min_search_steps=steps, max_search_steps=steps,
+            min_search_steps=parameters["steps"], max_search_steps=parameters["steps"],
         ))
 
+    return _describe(candidate, parameters)
+
+
+def _describe(candidate, parameters):
     validate_cycle(candidate.points).raise_for_errors()
     classification = classify_knot(candidate.points)
     score = score_projection(candidate.points)
@@ -83,9 +97,7 @@ def generate_record(options: dict) -> dict:
         svg = target.read_text(encoding="utf-8")
     return {
         "schema_version": 1,
-        "parameters": {"preset": preset, "seed": str(seed), "point_count": size,
-                       "crossings": crossings, "steps": steps,
-                       "crossing_mode": crossing_mode if preset == "travel" else "grid"},
+        "parameters": parameters,
         "name": classification.name,
         "classification": {"status": classification.status,
                            "evidence": classification.evidence,
@@ -96,8 +108,43 @@ def generate_record(options: dict) -> dict:
         "points": [[p.x, p.y, p.z] for p in candidate.points],
         "code": candidate.code,
         "metrics": asdict(score.metrics),
+        "layer_lengths": list(layer_lengths(candidate.points)),
         "svg": svg,
     }
+
+
+def minimize_record(options: dict) -> dict:
+    """Optimize the displayed points, never regenerate a different seed."""
+    if not isinstance(options, dict) or set(options) - {"points", "parameters", "max_moves"}:
+        raise ValueError("Ungültige Minimierungsparameter.")
+    parameters = _parameters(options.get("parameters", {}))
+    budget = _integer(options.get("max_moves", 120), "Zuglimit", 1, 240)
+    original, result, trace, transform = minimize_points(options.get("points"), max_moves=budget)
+    before = classify_knot(original)
+    record = _describe(trace, parameters)
+    after = record["classification"]
+    if (before.determinant is not None and after["determinant"] is not None
+            and before.determinant != after["determinant"]):
+        raise RuntimeError("Die Kontrolle der Knotendeterminante ist fehlgeschlagen; "
+                           "das Ergebnis wurde verworfen.")
+    if before.status == "certified":
+        record["name"] = before.name
+        record["classification"] = {"status": "certified", "determinant": before.determinant,
+                                     "evidence": "certified input preserved by replayable isotopies"}
+    elif after["determinant"] is None and before.determinant is not None:
+        after["determinant"] = before.determinant
+        after["evidence"] = "input determinant preserved by replayable isotopies; nonregular output projection"
+    record["optimization"] = {
+        "status": result.status, "points_before": len(original) - 1,
+        "points_after": len(trace.points) - 1,
+        "layers_before": list(layer_lengths(original)),
+        "layers_after": record["layer_lengths"], "move_count": len(result.moves),
+        "max_moves": budget, "max_route_states": 200, "max_seconds": 8,
+        "objective": "point count, layer-length imbalance, canonical Cantor order",
+        "input_points": [[p.x, p.y, p.z] for p in original],
+        "moves": [asdict(move) for move in result.moves], "normalization": transform,
+    }
+    return record
 
 
 class StudioServer(ThreadingHTTPServer):
@@ -156,23 +203,31 @@ class StudioHandler(BaseHTTPRequestHandler):
         }):
             self._json(403, {"error": "Nur lokale Zugriffe sind erlaubt."})
             return
-        if self.path != "/api/generate":
+        if self.path not in ("/api/generate", "/api/minimize"):
             self._json(404, {"error": "Nicht gefunden."})
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if not 0 < length <= 8192:
-                raise ValueError("Die Anfrage muss zwischen 1 und 8192 Bytes enthalten.")
+            limit = 512_000 if self.path == "/api/minimize" else 8192
+            if not 0 < length <= limit:
+                # Drain modest oversized bodies before closing the socket;
+                # unread TCP data can otherwise reset the 400 reply on Windows.
+                if 0 < length <= 512_001:
+                    self.rfile.read(length)
+                raise ValueError(f"Die Anfrage muss zwischen 1 und {limit} Bytes enthalten.")
+            body = self.rfile.read(length)
             if self.headers.get_content_type() != "application/json":
                 raise ValueError("Die Anfrage muss JSON enthalten.")
-            options = json.loads(self.rfile.read(length))
-            record = generate_record(options)
+            options = json.loads(body)
+            record = minimize_record(options) if self.path == "/api/minimize" else generate_record(options)
         except (ValueError, UnicodeError) as error:
             self._json(400, {"error": str(error)})
             return
-        except RuntimeError:
-            self._json(422, {"error": "Innerhalb des Versuchslimits wurde kein geschlossener "
-                        "Kandidat gefunden. Bitte einen anderen Seed wählen."})
+        except RuntimeError as error:
+            message = (str(error) if self.path == "/api/minimize" else
+                       "Innerhalb des Versuchslimits wurde kein geschlossener "
+                       "Kandidat gefunden. Bitte einen anderen Seed wählen.")
+            self._json(422, {"error": message})
             return
         self._json(200, record)
 
